@@ -13,6 +13,8 @@ pub mod ops;
 pub mod optim;
 pub mod rnn;
 pub mod rotary_emb;
+#[cfg(feature = "cuda")]
+pub mod rope;
 pub mod sequential;
 pub mod var_builder;
 pub mod var_map;
