@@ -91,7 +91,7 @@ impl RotaryEmbedding {
             pos_storage.as_cuda_slice::<i64>()?,
             q_storage.as_cuda_slice::<T>()?,
             k_storage.as_cuda_slice::<T>()?,
-            cache_storage.as_cuda_slice::<f32>()?,
+            cache_storage.as_cuda_slice::<T>()?,
             rot_dim,
             q_stride,
             k_stride,
@@ -115,7 +115,7 @@ impl RotaryEmbedding {
         match (
             &*q.storage_and_layout().0,
             &*k.storage_and_layout().0,
-            &*self.cache.storage_and_layout().0,
+            &*self.cache.to_dtype(q.dtype())?.storage_and_layout().0,
             &*positions.storage_and_layout().0,
         ) {
             (
