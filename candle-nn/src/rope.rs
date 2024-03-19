@@ -208,7 +208,7 @@ impl RotaryEmbedding {
                         cache_storage,
                         pos_storage,
                     ),
-                    _ => candle::bail!("DType mismatch in fused RotaryEmbedding q={}, k={}, cache={}", q.dtype(), k.dtype(), cache_type),
+                    _ => candle::bail!("DType mismatch in fused RotaryEmbedding q={:?}, k={:?}, cache={:?}", q.dtype(), k.dtype(), cache_type),
                 }
             }
             _ => unreachable!(),
