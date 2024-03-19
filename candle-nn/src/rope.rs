@@ -287,11 +287,11 @@ impl RotaryEmbedding {
             Tensor::cat(&[&xs2.neg()?, &xs1], D::Minus1)
         }
 
-        let (_b_sz, _h, seq_len, _n_embd) = q.dims4()?;
+        let (b_sz, _h, seq_len, _n_embd) = x.dims4()?;
         let embeds = Vec::new();
         for (b, seqlen_offset) in zip(0..b_sz, seqlen_offsets) {
-            let cos = self.cos.narrow(0, seqlen_offset, seq_len)?;
-            let sin = self.sin.narrow(0, seqlen_offset, seq_len)?;
+            let cos = self.cos.narrow(0, *seqlen_offset, seq_len)?;
+            let sin = self.sin.narrow(0, *seqlen_offset, seq_len)?;
             let cos = cos.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
             let sin = sin.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
             let x_b = x.i(b)?.unsqueeze(0)?;
