@@ -91,8 +91,8 @@ impl RotaryEmbedding {
         dbg!(cos.shape());
         Ok(Self {
             head_size: head_dim,
-            cos: cos.clone(),
-            sin: sin.clone(),
+            cos: cos.clone().to_dtype(DType::BF16)?,
+            sin: sin.clone().to_dtype(DType::BF16)?,
             cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?.contiguous()?.to_dtype(DType::BF16)?,
             is_gpt_neox,
         })
