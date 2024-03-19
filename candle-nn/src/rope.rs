@@ -62,6 +62,7 @@ impl RotaryEmbedding {
             let cos = freqs.cos()?;
             dbg!(cos.mean_all());
             dbg!(cos.to_dtype(DType::BF16)?.mean_all());
+            dbg!(cos.shape());
         }
         dbg!(base);
         dbg!(head_dim);
@@ -80,6 +81,7 @@ impl RotaryEmbedding {
         let sin = idx_theta.sin()?;
         dbg!(cos.mean_all());
         dbg!(cos.to_dtype(DType::BF16)?.mean_all());
+        dbg!(cos.shape());
         Ok(Self {
             head_size: head_dim,
             cos: cos.clone(),
