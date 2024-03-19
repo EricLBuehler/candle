@@ -39,9 +39,9 @@ impl RotaryEmbedding {
             .step_by(2)
             .map(|i| 1f32 / base.powf(i as f32 / head_dim as f32))
             .collect();
-        let theta = Tensor::new(theta.as_slice(), device)?.to_dtype(DType::F16)?;
+        let theta = Tensor::new(theta.as_slice(), device)?.to_dtype(DType::F64)?;
         let idx_theta = Tensor::arange(0, max_position_embeddings as u32, device)?
-            .to_dtype(DType::F16)?//.to_dtype(DType::F32)?
+            .to_dtype(DType::F64)?//.to_dtype(DType::F32)?
             .reshape((max_position_embeddings, 1))?
             .matmul(&theta.reshape((1, theta.elem_count()))?)?;
         let cos = idx_theta.cos()?;
