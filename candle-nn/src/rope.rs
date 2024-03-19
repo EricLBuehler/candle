@@ -33,21 +33,19 @@ impl RotaryEmbedding {
         is_gpt_neox: bool,
     ) -> Result<Self> {
         {
-            let inv_freq: Vec<_> = (0..head_dim)
+            let dim = cfg.hidden_size / cfg.num_attention_heads;
+            let max_seq_len = cfg.max_position_embeddings;
+            let inv_freq: Vec<_> = (0..dim)
                 .step_by(2)
-                .map(|i| 1f32 / 10000f32.powf(i as f32 / head_dim as f32))
+                .map(|i| 1f32 / 10000f32.powf(i as f32 / dim as f32))
                 .collect();
             let inv_freq_len = inv_freq.len();
-            let inv_freq = Tensor::from_vec(inv_freq, (1, inv_freq_len), device)?.to_dtype(DType::BF16)?;
-            let t = Tensor::arange(0u32, max_position_embeddings as u32, device)?
-                .to_dtype(DType::BF16)?
-                .reshape((max_position_embeddings, 1))?;
+            let inv_freq = Tensor::from_vec(inv_freq, (1, inv_freq_len), dev)?.to_dtype(dtype)?;
+            let t = Tensor::arange(0u32, max_seq_len as u32, dev)?
+                .to_dtype(dtype)?
+                .reshape((max_seq_len, 1))?;
             let freqs = t.matmul(&inv_freq)?;
-            let freqs = Tensor::cat(&[&freqs.cos()?, &freqs.sin()?], D::Minus1)?;
-            let cos = freqs.cos()?;
-            dbg!(cos.mean_all());
-            dbg!(cos.to_dtype(DType::BF16)?.mean_all());
-            dbg!(cos.shape());
+            let freqs = Tensor::cat(&[&freqs, &freqs], D::Minus1)?;
             return Ok(Self {
                 head_size: head_dim,
                 cos: freqs.cos()?,
