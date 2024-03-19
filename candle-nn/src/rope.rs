@@ -234,7 +234,7 @@ impl RotaryEmbedding {
         match (q.device(), k.device()) {
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
-                self.fused_rope(dev, positions_kernel, &*q, &*k);
+                self.fused_rope(dev, positions_kernel, &*q, &*k)?;
             }
 
             _ => {
