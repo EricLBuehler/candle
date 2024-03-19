@@ -35,11 +35,11 @@ impl RotaryEmbedding {
         {
             let inv_freq: Vec<_> = (0..head_dim)
                 .step_by(2)
-                .map(|i| 1f32 / 10000f32.powf(i as f32 / dim as f32))
+                .map(|i| 1f32 / 10000f32.powf(i as f32 / head_dim as f32))
                 .collect();
             let inv_freq_len = inv_freq.len();
-            let inv_freq = Tensor::from_vec(inv_freq, (1, inv_freq_len), dev)?.to_dtype(DType::F32)?;
-            let t = Tensor::arange(0u32, max_position_embeddings as u32, dev)?
+            let inv_freq = Tensor::from_vec(inv_freq, (1, inv_freq_len), device)?.to_dtype(DType::F32)?;
+            let t = Tensor::arange(0u32, max_position_embeddings as u32, device)?
                 .to_dtype(DType::F32)?
                 .reshape((max_position_embeddings, 1))?;
             let freqs = t.matmul(&inv_freq)?;
