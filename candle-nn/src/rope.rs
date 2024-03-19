@@ -89,6 +89,9 @@ impl RotaryEmbedding {
             block_dim: (512.min((num_heads * rot_dim / 2) as u32), 1, 1),
             shared_mem_bytes: 0,
         };
+        dbg!(q_storage.dtype());
+        dbg!(k_storage.dtype());
+        dbg!(cache_storage.dtype());
 
         let params = (
             pos_storage.as_cuda_slice::<i64>()?,
