@@ -65,8 +65,8 @@ impl RotaryEmbedding {
             dbg!(cos.shape());
             return Ok(Self {
                 head_size: head_dim,
-                cos: cos.clone(),
-                sin: sin.clone(),
+                cos: freqs.clone(),
+                sin: freqs.clone(),
                 cache: freqs.contiguous().to_dtype(DType::F32)?,
                 is_gpt_neox,
             })
