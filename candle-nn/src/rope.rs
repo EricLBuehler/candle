@@ -36,9 +36,9 @@ impl RotaryEmbedding {
             .step_by(2)
             .map(|i| 1f32 / base.powf(i as f32 / head_dim as f32))
             .collect();
-        let theta = Tensor::new(theta.as_slice(), device)?;
+        let theta = Tensor::new(theta.as_slice(), device)?.to_dtype(DType::BF16)?;
         let idx_theta = Tensor::arange(0, max_position_embeddings as u32, device)?
-            .to_dtype(DType::F32)?
+            .to_dtype(DType::BF16)?//.to_dtype(DType::F32)?
             .reshape((max_position_embeddings, 1))?
             .matmul(&theta.reshape((1, theta.elem_count()))?)?;
         let cos = idx_theta.cos()?;
@@ -179,9 +179,9 @@ impl RotaryEmbedding {
     ) -> Result<()> {
         *q = q.contiguous()?;
         *k = k.contiguous()?;
-        let old_dtype = q.dtype();
-        *q = q.to_dtype(DType::F32)?;
-        *k = k.to_dtype(DType::F32)?;
+        //let old_dtype = q.dtype();
+        //*q = q.to_dtype(DType::F32)?;
+        //*k = k.to_dtype(DType::F32)?;
         match (q.device(), k.device()) {
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
@@ -193,8 +193,8 @@ impl RotaryEmbedding {
                 *k = self.apply_rotary_emb(&*k, positions)?;
             }
         };
-        *q = q.to_dtype(old_dtype)?;
-        *k = k.to_dtype(old_dtype)?;
+        //*q = q.to_dtype(old_dtype)?;
+        //*k = k.to_dtype(old_dtype)?;
         *q = q.contiguous()?;
         *k = k.contiguous()?;
         Ok(())
