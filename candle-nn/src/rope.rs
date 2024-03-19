@@ -165,7 +165,7 @@ impl RotaryEmbedding {
                 }
             }
             _ => unreachable!(),
-        }
+        };
     }
 
     /// This may modify the tensors in place!
@@ -187,7 +187,7 @@ impl RotaryEmbedding {
                 *k = k.to_dtype(DType::F32)?;
                 self.fused_rope(dev, positions_kernel, &*q, &*k);
                 *q = q.to_dtype(old_dtype)?;
-                *k = k.to_device(old_dtype)?;
+                *k = k.to_dtype(old_dtype)?;
             }
 
             _ => {
