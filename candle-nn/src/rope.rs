@@ -179,15 +179,13 @@ impl RotaryEmbedding {
     ) -> Result<()> {
         *q = q.contiguous()?;
         *k = k.contiguous()?;
+        let old_dtype = q.dtype();
+        *q = q.to_dtype(DType::F32)?;
+        *k = k.to_dtype(DType::F32)?;
         match (q.device(), k.device()) {
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
-                let old_dtype = q.dtype();
-                *q = q.to_dtype(DType::F32)?;
-                *k = k.to_dtype(DType::F32)?;
                 self.fused_rope(dev, positions_kernel, &*q, &*k);
-                *q = q.to_dtype(old_dtype)?;
-                *k = k.to_dtype(old_dtype)?;
             }
 
             _ => {
@@ -195,6 +193,8 @@ impl RotaryEmbedding {
                 *k = self.apply_rotary_emb(&*k, positions)?;
             }
         };
+        *q = q.to_dtype(old_dtype)?;
+        *k = k.to_dtype(old_dtype)?;
         *q = q.contiguous()?;
         *k = k.contiguous()?;
         Ok(())
