@@ -112,7 +112,8 @@ impl RotaryEmbedding {
         q: &Tensor,
         k: &Tensor,
     ) -> Result<()> {
-        let tmp = match (
+        let cache_type = self.cache.dtype();
+        match (
             &*q.storage_and_layout().0,
             &*k.storage_and_layout().0,
             &*self.cache.storage_and_layout().0,
@@ -124,8 +125,8 @@ impl RotaryEmbedding {
                 Storage::Cuda(cache_storage),
                 Storage::Cuda(pos_storage),
             ) => {
-                return match (q.dtype(), k.dtype()) {
-                    (DType::BF16, DType::BF16) => self.execute_dtype::<half::bf16>(
+                return match (q.dtype(), k.dtype(), cache_type) {
+                    (DType::BF16, DType::BF16, DType::BF16) => self.execute_dtype::<half::bf16>(
                         &dev,
                         q_storage,
                         k_storage,
@@ -134,7 +135,7 @@ impl RotaryEmbedding {
                         cache_storage,
                         pos_storage,
                     ),
-                    (DType::F16, DType::F16) => self.execute_dtype::<half::f16>(
+                    (DType::F16, DType::F16, DType::F16) => self.execute_dtype::<half::f16>(
                         &dev,
                         q_storage,
                         k_storage,
@@ -143,7 +144,7 @@ impl RotaryEmbedding {
                         cache_storage,
                         pos_storage,
                     ),
-                    (DType::F32, DType::F32) => self.execute_dtype::<f32>(
+                    (DType::F32, DType::F32, DType::F32) => self.execute_dtype::<f32>(
                         &dev,
                         q_storage,
                         k_storage,
@@ -152,7 +153,7 @@ impl RotaryEmbedding {
                         cache_storage,
                         pos_storage,
                     ),
-                    (DType::F64, DType::F64) => self.execute_dtype::<f64>(
+                    (DType::F64, DType::F64, DType::F64) => self.execute_dtype::<f64>(
                         &dev,
                         q_storage,
                         k_storage,
