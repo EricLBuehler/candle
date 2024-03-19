@@ -32,7 +32,7 @@ impl RotaryEmbedding {
         device: &Device,
         is_gpt_neox: bool,
     ) -> Result<Self> {
-        {
+        /*{
             let inv_freq: Vec<_> = (0..head_dim)
                 .step_by(2)
                 .map(|i| 1f32 / 10000f32.powf(i as f32 / head_dim as f32))
@@ -70,7 +70,7 @@ impl RotaryEmbedding {
                 cache: freqs.contiguous()?.to_dtype(DType::BF16)?,
                 is_gpt_neox,
             })
-        }
+        }*/
         dbg!(base);
         dbg!(head_dim);
         dbg!(max_position_embeddings);
