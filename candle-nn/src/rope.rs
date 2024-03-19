@@ -188,6 +188,8 @@ impl RotaryEmbedding {
         //let old_dtype = q.dtype();
         //*q = q.to_dtype(DType::F32)?;
         //*k = k.to_dtype(DType::F32)?;
+        dbg!(q.mean_all());
+        dbg!(q.to_dtype(DType::BF16)?.mean_all());
         match (q.device(), k.device()) {
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
