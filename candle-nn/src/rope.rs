@@ -226,11 +226,11 @@ impl RotaryEmbedding {
     ) -> Result<()> {
         *q = q.contiguous()?;
         *k = k.contiguous()?;
-        let old_dtype = q.dtype();
-        *q = q.to_dtype(DType::F32)?;
-        *k = k.to_dtype(DType::F32)?;
-        dbg!(q.mean_all());
-        dbg!(q.to_dtype(DType::BF16)?.mean_all());
+        //let old_dtype = q.dtype();
+        //*q = q.to_dtype(DType::F32)?;
+        //*k = k.to_dtype(DType::F32)?;
+        //dbg!(q.mean_all());
+        //dbg!(q.to_dtype(DType::BF16)?.mean_all());
         match (q.device(), k.device()) {
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
@@ -242,8 +242,8 @@ impl RotaryEmbedding {
                 *k = self.apply_rotary_emb(&*k, positions)?;
             }
         };
-        *q = q.to_dtype(old_dtype)?;
-        *k = k.to_dtype(old_dtype)?;
+        //*q = q.to_dtype(old_dtype)?;
+        //*k = k.to_dtype(old_dtype)?;
         *q = q.contiguous()?;
         *k = k.contiguous()?;
         Ok(())
