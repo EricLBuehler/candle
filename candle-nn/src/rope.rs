@@ -46,6 +46,8 @@ impl RotaryEmbedding {
             .matmul(&theta.reshape((1, theta.elem_count()))?)?;
         let cos = idx_theta.cos()?;
         let sin = idx_theta.sin()?;
+        dbg!(cos.mean_all());
+        dbg!(cos.to_dtype(DType::BF16)?.mean_all());
         Ok(Self {
             head_size: head_dim,
             cos: cos.clone(),
