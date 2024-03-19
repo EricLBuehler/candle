@@ -113,7 +113,7 @@ impl RotaryEmbedding {
         k: &Tensor,
     ) -> Result<()> {
         let cache = self.cache.to_dtype(q.dtype())?;
-        match (
+        let tmp = match (
             &*q.storage_and_layout().0,
             &*k.storage_and_layout().0,
             &*cache.storage_and_layout().0,
@@ -166,7 +166,7 @@ impl RotaryEmbedding {
                 }
             }
             _ => unreachable!(),
-        }
+        }; tmp
     }
 
     /// This may modify the tensors in place!
