@@ -58,7 +58,7 @@ impl RotaryEmbedding {
                 .to_dtype(DType::BF16)?
                 .reshape((max_position_embeddings, 1))?;
             let freqs = t.matmul(&inv_freq)?;
-            let freqs = Tensor::cat(&[&freqs, &freqs], D::Minus1)?;
+            let freqs = Tensor::cat(&[&freqs.cos()?, &freqs.sin()?], D::Minus1)?;
             let cos = freqs.cos()?;
             dbg!(cos.mean_all());
             dbg!(cos.to_dtype(DType::BF16)?.mean_all());
