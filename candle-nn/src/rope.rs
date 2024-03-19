@@ -63,6 +63,13 @@ impl RotaryEmbedding {
             dbg!(cos.mean_all());
             dbg!(cos.to_dtype(DType::BF16)?.mean_all());
             dbg!(cos.shape());
+            return Ok(Self {
+                head_size: head_dim,
+                cos: cos.clone(),
+                sin: sin.clone(),
+                cache: freqs.contiguous().to_dtype(DType::F32)?,
+                is_gpt_neox,
+            })
         }
         dbg!(base);
         dbg!(head_dim);
