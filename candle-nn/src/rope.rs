@@ -67,7 +67,7 @@ impl RotaryEmbedding {
                 head_size: head_dim,
                 cos: freqs.clone(),
                 sin: freqs.clone(),
-                cache: freqs.contiguous()?.to_dtype(DType::F32)?,
+                cache: freqs.contiguous()?.to_dtype(DType::BF16)?,
                 is_gpt_neox,
             })
         }
