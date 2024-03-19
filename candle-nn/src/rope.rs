@@ -92,12 +92,12 @@ impl RotaryEmbedding {
             q_storage.as_cuda_slice::<T>()?,
             k_storage.as_cuda_slice::<T>()?,
             cache_storage.as_cuda_slice::<T>()?,
-            rot_dim,
-            q_stride,
-            k_stride,
-            num_heads,
-            num_kv_heads,
-            self.head_size,
+            rot_dim as i32,
+            q_stride as i64,
+            k_stride as i64,
+            num_heads as i32,
+            num_kv_heads as i32,
+            self.head_size as i32,
         );
         unsafe { func.launch(cfg, params) }.w()?;
 
