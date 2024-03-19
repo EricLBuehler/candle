@@ -112,10 +112,11 @@ impl RotaryEmbedding {
         q: &Tensor,
         k: &Tensor,
     ) -> Result<()> {
+        let cache = self.cache.to_dtype(q.dtype())?;
         match (
             &*q.storage_and_layout().0,
             &*k.storage_and_layout().0,
-            &*self.cache.to_dtype(q.dtype())?.storage_and_layout().0,
+            &*cache.storage_and_layout().0,
             &*positions.storage_and_layout().0,
         ) {
             (
