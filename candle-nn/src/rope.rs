@@ -32,6 +32,9 @@ impl RotaryEmbedding {
         device: &Device,
         is_gpt_neox: bool,
     ) -> Result<Self> {
+        dbg!(base);
+        dbg!(head_dim);
+        dbg!(max_position_embeddings);
         let theta: Vec<_> = (0..head_dim)
             .step_by(2)
             .map(|i| 1f32 / base.powf(i as f32 / head_dim as f32))
