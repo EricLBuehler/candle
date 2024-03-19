@@ -44,6 +44,7 @@ impl RotaryEmbedding {
                 .reshape((max_position_embeddings, 1))?;
             let freqs = t.matmul(&inv_freq)?;
             let freqs = Tensor::cat(&[&freqs, &freqs], D::Minus1)?;
+            dbg!(freqs.mean_all());
             return Ok(Self {
                 head_size: head_dim,
                 cos: freqs.cos()?,
