@@ -32,6 +32,9 @@ impl RotaryEmbedding {
         device: &Device,
         is_gpt_neox: bool,
     ) -> Result<Self> {
+        dbg!(base);
+        dbg!(head_dim);
+        dbg!(max_position_embeddings);
         {
             let inv_freq: Vec<_> = (0..head_dim)
                 .step_by(2)
