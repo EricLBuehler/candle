@@ -32,6 +32,21 @@ impl RotaryEmbedding {
         device: &Device,
         is_gpt_neox: bool,
     ) -> Result<Self> {
+        {
+            let inv_freq: Vec<_> = (0..head_dim)
+                .step_by(2)
+                .map(|i| 1f32 / 10000f32.powf(i as f32 / dim as f32))
+                .collect();
+            let inv_freq_len = inv_freq.len();
+            let inv_freq = Tensor::from_vec(inv_freq, (1, inv_freq_len), dev)?.to_dtype(DType::F32)?;
+            let t = Tensor::arange(0u32, max_position_embeddings as u32, dev)?
+                .to_dtype(DType::F32)?
+                .reshape((max_position_embeddings, 1))?;
+            let freqs = t.matmul(&inv_freq)?;
+            let freqs = Tensor::cat(&[&freqs, &freqs], D::Minus1)?;
+            dbg!(freqs.mean_all());
+            dbg!(freqs.to_dtype(DType::BF16)?.mean_all());
+        }
         dbg!(base);
         dbg!(head_dim);
         dbg!(max_position_embeddings);
