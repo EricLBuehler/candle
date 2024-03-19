@@ -112,11 +112,10 @@ impl RotaryEmbedding {
         q: &Tensor,
         k: &Tensor,
     ) -> Result<()> {
-        let cache = self.cache.to_dtype(q.dtype())?;
         let tmp = match (
             &*q.storage_and_layout().0,
             &*k.storage_and_layout().0,
-            &*cache.storage_and_layout().0,
+            &*self.cache.storage_and_layout().0,
             &*positions.storage_and_layout().0,
         ) {
             (
@@ -166,7 +165,7 @@ impl RotaryEmbedding {
                 }
             }
             _ => unreachable!(),
-        }; tmp
+        }
     }
 
     /// This may modify the tensors in place!
@@ -183,7 +182,12 @@ impl RotaryEmbedding {
         match (q.device(), k.device()) {
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
+                let old_dtype = q.dtype();
+                *q = q.to_dtype(DType::F32)?;
+                *k = k.to_dtype(DType::F32)?;
                 self.fused_rope(dev, positions_kernel, &*q, &*k);
+                *q = q.to_dtype(old_dtype)?;
+                *k = k.to_device(old_dtype)?;
             }
 
             _ => {
