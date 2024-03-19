@@ -13,7 +13,6 @@ use candle::cuda_backend::{
     },
     kernel_name, kernels, CudaDType,
 };
-use num_traits::real::Real;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -77,12 +76,12 @@ impl RotaryEmbedding {
         dbg!(max_position_embeddings);
         let theta: Vec<_> = (0..head_dim)
             .step_by(2)
-            .map(|i| half::bf16::from_f32(1.) /  half::bf16::from_f32(base).powf((half::bf16::from_f32(i as f32) / half::bf16::from_f32(head_dim as f32))))
+            .map(|i| 1f32 / base.powf(i as f32 / head_dim as f32))
             .collect();
         let theta_len = theta.len();
-        let theta = Tensor::from_vec(theta, (1, theta_len), device)?.to_dtype(DType::BF16)?;
+        let theta = Tensor::from_vec(theta, (1, theta_len), device)?.to_dtype(DType::F32)?;
         let idx_theta = Tensor::arange(0, max_position_embeddings as u32, device)?
-            .to_dtype(DType::BF16)?
+            .to_dtype(DType::F32)?
             .reshape((max_position_embeddings, 1))?
             .matmul(&theta)?;
         let cos = idx_theta.cos()?;
@@ -233,10 +232,10 @@ impl RotaryEmbedding {
         //dbg!(q.mean_all());
         //dbg!(q.to_dtype(DType::BF16)?.mean_all());
         match (q.device(), k.device()) {
-            #[cfg(feature = "cuda")]
+            /*#[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
                 self.fused_rope(dev, positions_kernel, &*q, &*k)?;
-            }
+            }*/
 
             _ => {
                 *q = self.apply_rotary_emb(&*q, positions)?;
