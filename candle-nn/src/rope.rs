@@ -32,22 +32,7 @@ impl RotaryEmbedding {
         device: &Device,
         is_gpt_neox: bool,
     ) -> Result<Self> {
-        /*{
-            let inv_freq: Vec<_> = (0..head_dim)
-                .step_by(2)
-                .map(|i| 1f32 / 10000f32.powf(i as f32 / head_dim as f32))
-                .collect();
-            let inv_freq_len = inv_freq.len();
-            let inv_freq = Tensor::from_vec(inv_freq, (1, inv_freq_len), device)?.to_dtype(DType::F32)?;
-            let t = Tensor::arange(0u32, max_position_embeddings as u32, device)?
-                .to_dtype(DType::F32)?
-                .reshape((max_position_embeddings, 1))?;
-            let freqs = t.matmul(&inv_freq)?;
-            let freqs = Tensor::cat(&[&freqs, &freqs], D::Minus1)?;
-            let cos = freqs.cos()?;
-            dbg!(cos.mean_all());
-            dbg!(cos.to_dtype(DType::BF16)?.mean_all());
-
+        {
             let inv_freq: Vec<_> = (0..head_dim)
                 .step_by(2)
                 .map(|i| 1f32 / 10000f32.powf(i as f32 / head_dim as f32))
@@ -65,12 +50,12 @@ impl RotaryEmbedding {
             dbg!(cos.shape());
             return Ok(Self {
                 head_size: head_dim,
-                cos: freqs.clone(),
-                sin: freqs.clone(),
+                cos: freqs.cos()?,
+                sin: freqs.sin()?,
                 cache: freqs.contiguous()?.to_dtype(DType::BF16)?,
                 is_gpt_neox,
             })
-        }*/
+        }
         dbg!(base);
         dbg!(head_dim);
         dbg!(max_position_embeddings);
@@ -288,7 +273,7 @@ impl RotaryEmbedding {
         }
 
         let (b_sz, _h, seq_len, _n_embd) = x.dims4()?;
-        let embeds = Vec::new();
+        let mut embeds = Vec::new();
         for (b, seqlen_offset) in zip(0..b_sz, seqlen_offsets) {
             let cos = self.cos.narrow(0, *seqlen_offset, seq_len)?;
             let sin = self.sin.narrow(0, *seqlen_offset, seq_len)?;
