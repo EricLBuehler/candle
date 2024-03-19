@@ -40,9 +40,9 @@ impl RotaryEmbedding {
             .map(|i| 1f32 / base.powf(i as f32 / head_dim as f32))
             .collect();
         let theta_len = theta.len();
-        let theta = Tensor::from_vec(theta, (1, theta_len), device)?.to_dtype(DType::BF16)?;
+        let theta = Tensor::from_vec(theta, (1, theta_len), device)?.to_dtype(DType::F32)?;
         let idx_theta = Tensor::arange(0, max_position_embeddings as u32, device)?
-            .to_dtype(DType::BF16)?
+            .to_dtype(DType::F32)?
             .reshape((max_position_embeddings, 1))?
             .matmul(&theta)?;
         let cos = idx_theta.cos()?;
@@ -53,7 +53,7 @@ impl RotaryEmbedding {
             head_size: head_dim,
             cos: cos.clone(),
             sin: sin.clone(),
-            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?.contiguous()?.to_dtype(DType::BF16)?,
+            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?.contiguous()?.to_dtype(DType::F32)?,
             is_gpt_neox,
         })
     }
@@ -186,9 +186,9 @@ impl RotaryEmbedding {
     ) -> Result<()> {
         *q = q.contiguous()?;
         *k = k.contiguous()?;
-        //let old_dtype = q.dtype();
-        //*q = q.to_dtype(DType::F32)?;
-        //*k = k.to_dtype(DType::F32)?;
+        let old_dtype = q.dtype();
+        *q = q.to_dtype(DType::F32)?;
+        *k = k.to_dtype(DType::F32)?;
         dbg!(q.mean_all());
         dbg!(q.to_dtype(DType::BF16)?.mean_all());
         match (q.device(), k.device()) {
@@ -202,8 +202,8 @@ impl RotaryEmbedding {
                 *k = self.apply_rotary_emb(&*k, positions)?;
             }
         };
-        //*q = q.to_dtype(old_dtype)?;
-        //*k = k.to_dtype(old_dtype)?;
+        *q = q.to_dtype(old_dtype)?;
+        *k = k.to_dtype(old_dtype)?;
         *q = q.contiguous()?;
         *k = k.contiguous()?;
         Ok(())
