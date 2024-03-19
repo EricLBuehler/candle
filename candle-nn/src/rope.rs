@@ -93,7 +93,7 @@ impl RotaryEmbedding {
             head_size: head_dim,
             cos: cos.clone(),
             sin: sin.clone(),
-            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?.contiguous()?.to_dtype(DType::F32)?,
+            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?.contiguous()?,//.to_dtype(DType::F32)?,
             is_gpt_neox,
         })
     }
