@@ -31,6 +31,7 @@ impl RotaryEmbedding {
         max_position_embeddings: usize,
         device: &Device,
         is_gpt_neox: bool,
+        _dtype: DType,
     ) -> Result<Self> {
         dbg!(base);
         dbg!(head_dim);
