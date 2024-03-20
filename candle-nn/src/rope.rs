@@ -282,6 +282,8 @@ impl RotaryEmbedding {
             let sin = sin.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
             let x_b = x.i(b)?.unsqueeze(0)?;
             let x_embed = (x_b.broadcast_mul(&cos)? + rotate_half(&x_b)?.broadcast_mul(&sin))?;
+            dbg!(&x_embed);
+            dbg!(&self.cos);
             embeds.push(x_embed);
         }
         Tensor::cat(&embeds, 0)
