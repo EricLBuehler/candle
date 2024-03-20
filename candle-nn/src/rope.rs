@@ -31,7 +31,7 @@ impl RotaryEmbedding {
         max_position_embeddings: usize,
         device: &Device,
         is_gpt_neox: bool,
-        _dtype: DType,
+        dtype: DType,
     ) -> Result<Self> {
         dbg!(base);
         dbg!(head_dim);
@@ -51,11 +51,12 @@ impl RotaryEmbedding {
         dbg!(cos.mean_all());
         dbg!(cos.to_dtype(DType::BF16)?.mean_all());
         dbg!(cos.shape());
+        dbg!(dtype);
         Ok(Self {
             head_size: head_dim,
-            cos: cos.clone().to_dtype(DType::BF16)?,
-            sin: sin.clone().to_dtype(DType::BF16)?,
-            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?.contiguous()?.to_dtype(DType::BF16)?,
+            cos: cos.clone().to_dtype(dtype)?,
+            sin: sin.clone().to_dtype(dtype)?,
+            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?.contiguous()?.to_dtype(dtype)?,
             is_gpt_neox,
         })
     }
