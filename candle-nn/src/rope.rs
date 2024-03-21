@@ -36,7 +36,6 @@ impl RotaryEmbedding {
         dbg!(base);
         dbg!(head_dim);
         dbg!(max_position_embeddings);
-        let max_position_embeddings = 32768;
         let theta: Vec<_> = (0..head_dim)
             .step_by(2)
             .map(|i| 1f32 / base.powf(i as f32 / head_dim as f32))
