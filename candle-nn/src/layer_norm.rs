@@ -153,7 +153,7 @@ impl LayerNorm {
             grid_dim: (1, max_grid_y.min(n_rows as u32), 1),
             block_dim: (32, BLOCK_DIM_Y, 1),
             shared_mem_bytes: 2 * BLOCK_DIM_Y * mem::size_of::<T>() as u32
-                + (BLOCK_DIM_Y) * mem::size_of::<T>() as u32,
+                + (BLOCK_DIM_Y) * mem::size_of::<i32>() as u32,
         };
         let mean = unsafe { dev.alloc::<T>(n_rows) }.w()?;
         let invvar = unsafe { dev.alloc::<T>(n_rows) }.w()?;
@@ -263,13 +263,13 @@ impl LayerNorm {
 
 impl crate::Module for LayerNorm {
     fn forward(&self, x: &Tensor) -> Result<Tensor> {
-        /*#[cfg(feature = "cuda")]
+        #[cfg(feature = "cuda")]
         match (x.dtype(), x.device()) {
             (DType::BF16, Device::Cuda(dev))
             | (DType::F32, Device::Cuda(dev))
             | (DType::F16, Device::Cuda(dev)) => return self.fused_layernorm(x, dev),
             _ => {}
-        };*/
+        };
 
         let x_dtype = x.dtype();
         let internal_dtype = match x_dtype {
