@@ -234,6 +234,7 @@ impl RmsNorm {
             &*self.0.weight().storage_and_layout().0,
         ) {
             (Storage::Cuda(x_storage), Storage::Cuda(weight_storage)) => {
+                dbg!(&x);
                 match (x_storage.dtype(), weight_storage.dtype()) {
                     (DType::BF16, DType::BF16) => self.dtype_execute_rmsnorm::<half::bf16, _>(
                         dev,
@@ -266,6 +267,7 @@ impl RmsNorm {
 
 impl crate::Module for RmsNorm {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
+        dbg!(&xs);
         #[cfg(feature = "cuda")]
         match (xs.dtype(), xs.device()) {
             (DType::BF16, Device::Cuda(dev))
