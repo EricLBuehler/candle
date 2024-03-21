@@ -218,7 +218,7 @@ impl RmsNorm {
         );
         unsafe { func.launch(cfg, params) }.w()?;
 
-        dbg!(x.shape());
+        dbg!(&x);
 
         Ok(from_storage_no_op(
             Storage::Cuda(CudaStorage::wrap_cuda_slice(out, dev.clone())),
