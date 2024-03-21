@@ -263,13 +263,13 @@ impl LayerNorm {
 
 impl crate::Module for LayerNorm {
     fn forward(&self, x: &Tensor) -> Result<Tensor> {
-        #[cfg(feature = "cuda")]
+        /*#[cfg(feature = "cuda")]
         match (x.dtype(), x.device()) {
             (DType::BF16, Device::Cuda(dev))
             | (DType::F32, Device::Cuda(dev))
             | (DType::F16, Device::Cuda(dev)) => return self.fused_layernorm(x, dev),
             _ => {}
-        };
+        };*/
 
         let x_dtype = x.dtype();
         let internal_dtype = match x_dtype {
