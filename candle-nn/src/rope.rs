@@ -196,10 +196,12 @@ impl RotaryEmbedding {
         //dbg!(q.mean_all());
         //dbg!(q.to_dtype(DType::BF16)?.mean_all());
         match (q.device(), k.device()) {
+            /*
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
                 self.fused_rope(dev, positions_kernel, &*q, &*k)?;
             }
+            */
 
             _ => {
                 *q = self.apply_rotary_emb(&*q, positions)?;
