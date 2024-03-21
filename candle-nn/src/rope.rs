@@ -187,7 +187,7 @@ impl RotaryEmbedding {
         q: &mut Tensor,
         k: &mut Tensor,
     ) -> Result<()> {
-        dbg!(q.mean_all());
+        //dbg!(q.mean_all());
         *q = q.contiguous()?;
         *k = k.contiguous()?;
         //let old_dtype = q.dtype();
