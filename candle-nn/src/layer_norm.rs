@@ -125,152 +125,10 @@ impl LayerNorm {
     pub fn bias(&self) -> &Tensor {
         &self.bias
     }
-
-    #[cfg(feature = "cuda")]
-    fn dtype_execute_layernorm<T: CudaDType + DeviceRepr + WithDType, F>(
-        &self,
-        dev: &CudaDevice,
-        elem_count: usize,
-        n_rows: usize,
-        n_cols: usize,
-        max_grid_y: u32,
-        eps_converter: F,
-        x_storage: &CudaStorage,
-        weight_storage: &CudaStorage,
-        bias_storage: &CudaStorage,
-        x: &Tensor,
-    ) -> Result<Tensor>
-    where
-        F: FnOnce(f64) -> T,
-    {
-        const BLOCK_DIM_Y: u32 = 4;
-        assert!(x.layout().is_contiguous());
-        let out = unsafe { dev.alloc::<T>(elem_count) }.w()?;
-        let func =
-            dev.get_or_load_func(&kernel_name::<T>("layernorm"), kernels::FUSED_LAYER_NORM)?;
-        // 2*blockDim.y*sizeof(U)+blockDim.y*sizeof(int) shared memory available.
-        let cfg = LaunchConfig {
-            grid_dim: (1, max_grid_y.min(n_rows as u32), 1),
-            block_dim: (32, BLOCK_DIM_Y, 1),
-            shared_mem_bytes: 2 * BLOCK_DIM_Y * mem::size_of::<T>() as u32
-                + (BLOCK_DIM_Y) * mem::size_of::<i32>() as u32,
-        };
-        let mean = unsafe { dev.alloc::<T>(n_rows) }.w()?;
-        let invvar = unsafe { dev.alloc::<T>(n_rows) }.w()?;
-
-        let params = (
-            &out,
-            &mean,
-            &invvar,
-            x_storage.as_cuda_slice::<T>()?,
-            n_rows,
-            n_cols,
-            eps_converter(self.eps),
-            weight_storage.as_cuda_slice::<T>()?,
-            bias_storage.as_cuda_slice::<T>()?,
-        );
-        unsafe { func.launch(cfg, params) }.w()?;
-
-        Ok(from_storage_no_op(
-            Storage::Cuda(CudaStorage::wrap_cuda_slice(out, dev.clone())),
-            x.shape(),
-            false,
-        ))
-    }
-
-    #[cfg(feature = "cuda")]
-    fn fused_layernorm(&self, x: &Tensor, dev: &CudaDevice) -> Result<Tensor> {
-        let elem_count = x.layout().shape().elem_count();
-        let dims = x.layout().shape().dims();
-        let dim_m1 = dims[dims.len() - 1];
-        let (n_rows, n_cols) = (elem_count / dim_m1, dim_m1);
-
-        let opt = *MAX_GRID_Y.try_lock().unwrap();
-        let max_grid_y = if let Some(max) = opt {
-            max
-        } else {
-            let mut devprop = sys::CUdevprop::default();
-            let res =
-                unsafe { sys::cuDeviceGetProperties(&mut devprop as *mut _, *dev.cu_device()) };
-            if res != sys::CUresult::CUDA_SUCCESS {
-                candle::bail!("{res:?}");
-            }
-            let max_grid_y: u32 = devprop.maxGridSize[1] as u32;
-            *MAX_GRID_Y.try_lock().unwrap() = Some(max_grid_y);
-            max_grid_y
-        };
-
-        match (
-            &*x.storage_and_layout().0,
-            &*self.weight().storage_and_layout().0,
-            &*self.bias().storage_and_layout().0,
-        ) {
-            (
-                Storage::Cuda(x_storage),
-                Storage::Cuda(weight_storage),
-                Storage::Cuda(bias_storage),
-            ) => {
-                match (
-                    x_storage.dtype(),
-                    weight_storage.dtype(),
-                    bias_storage.dtype(),
-                ) {
-                    (DType::BF16, DType::BF16, DType::BF16) => self
-                        .dtype_execute_layernorm::<half::bf16, _>(
-                            dev,
-                            elem_count,
-                            n_rows,
-                            n_cols,
-                            max_grid_y,
-                            |x| half::bf16::from_f64(x),
-                            x_storage,
-                            weight_storage,
-                            &*bias_storage,
-                            x,
-                        ),
-                    (DType::F16, DType::F16, DType::F16) => self
-                        .dtype_execute_layernorm::<half::f16, _>(
-                            dev,
-                            elem_count,
-                            n_rows,
-                            n_cols,
-                            max_grid_y,
-                            |x| half::f16::from_f64(x),
-                            x_storage,
-                            weight_storage,
-                            &*bias_storage,
-                            x,
-                        ),
-                    (DType::F32, DType::F32, DType::F32) => self.dtype_execute_layernorm::<f32, _>(
-                        dev,
-                        elem_count,
-                        n_rows,
-                        n_cols,
-                        max_grid_y,
-                        |x| x as f32,
-                        x_storage,
-                        weight_storage,
-                        &*bias_storage,
-                        x,
-                    ),
-                    _ => candle::bail!("DType mismatch in fused layernorm."),
-                }
-            }
-            _ => unreachable!(),
-        }
-    }
 }
 
 impl crate::Module for LayerNorm {
     fn forward(&self, x: &Tensor) -> Result<Tensor> {
-        #[cfg(feature = "cuda")]
-        match (x.dtype(), x.device()) {
-            (DType::BF16, Device::Cuda(dev))
-            | (DType::F32, Device::Cuda(dev))
-            | (DType::F16, Device::Cuda(dev)) => return self.fused_layernorm(x, dev),
-            _ => {}
-        };
-
         let x_dtype = x.dtype();
         let internal_dtype = match x_dtype {
             DType::F16 | DType::BF16 => DType::F32,
@@ -323,10 +181,97 @@ impl RmsNorm {
     pub fn into_inner(self) -> LayerNorm {
         self.0
     }
+
+    #[cfg(feature = "cuda")]
+    fn dtype_execute_rmsnorm<T: CudaDType + DeviceRepr + WithDType, F>(
+        &self,
+        dev: &CudaDevice,
+        eps_converter: F,
+        x_storage: &CudaStorage,
+        weight_storage: &CudaStorage,
+        x: &Tensor,
+    ) -> Result<Tensor>
+    where
+        F: FnOnce(f64) -> T,
+    {
+        assert!(x.layout().is_contiguous());
+        let hidden_size = *x.dims().last().unwrap();
+        let elem_count = x.elem_count();
+        let num_tokens = elem_count / hidden_size;
+        let out = unsafe { dev.alloc::<T>(elem_count) }.w()?;
+
+        let cfg = LaunchConfig {
+            grid_dim: (num_tokens as u32, 1, 1),
+            block_dim: (u32::min(hidden_size as u32, 1024), 1, 1),
+            shared_mem_bytes: 0,
+        };
+
+        let func = dev.get_or_load_func(&kernel_name::<T>("rms_norm"), kernels::FUSED_RMS_NORM)?;
+
+        let params = (
+            &out,
+            x_storage.as_cuda_slice::<T>()?,
+            weight_storage.as_cuda_slice::<T>()?,
+            eps_converter(self.0.eps),
+            num_tokens as i32,
+            hidden_size as i32,
+        );
+        unsafe { func.launch(cfg, params) }.w()?;
+
+        Ok(from_storage_no_op(
+            Storage::Cuda(CudaStorage::wrap_cuda_slice(out, dev.clone())),
+            x.shape(),
+            false,
+        ))
+    }
+
+    #[cfg(feature = "cuda")]
+    fn fused_rmsnorm(&self, x: &Tensor, dev: &CudaDevice) -> Result<Tensor> {
+        match (
+            &*x.storage_and_layout().0,
+            &*self.0.weight().storage_and_layout().0,
+        ) {
+            (Storage::Cuda(x_storage), Storage::Cuda(weight_storage)) => {
+                match (x_storage.dtype(), weight_storage.dtype()) {
+                    (DType::BF16, DType::BF16) => self.dtype_execute_rmsnorm::<half::bf16, _>(
+                        dev,
+                        |x| half::bf16::from_f64(x),
+                        &x_storage,
+                        &weight_storage,
+                        x,
+                    ),
+                    (DType::F16, DType::F16) => self.dtype_execute_rmsnorm::<half::f16, _>(
+                        dev,
+                        |x| half::f16::from_f64(x),
+                        &x_storage,
+                        &weight_storage,
+                        x,
+                    ),
+                    (DType::F32, DType::F32) => self.dtype_execute_rmsnorm::<f32, _>(
+                        dev,
+                        |x| x as f32,
+                        &x_storage,
+                        &weight_storage,
+                        x,
+                    ),
+                    _ => candle::bail!("DType mismatch in fused rmsnorm."),
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl crate::Module for RmsNorm {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
+        #[cfg(feature = "cuda")]
+        match (xs.dtype(), xs.device()) {
+            (DType::BF16, Device::Cuda(dev))
+            | (DType::F32, Device::Cuda(dev))
+            | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
+            _ => {}
+        };
+
         self.0.forward(xs)
     }
 }

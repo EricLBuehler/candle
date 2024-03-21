@@ -8,6 +8,6 @@ pub const QUANTIZED: &str = include_str!(concat!(env!("OUT_DIR"), "/quantized.pt
 pub const REDUCE: &str = include_str!(concat!(env!("OUT_DIR"), "/reduce.ptx"));
 pub const TERNARY: &str = include_str!(concat!(env!("OUT_DIR"), "/ternary.ptx"));
 pub const UNARY: &str = include_str!(concat!(env!("OUT_DIR"), "/unary.ptx"));
-pub const FUSED_LAYER_NORM: &str = include_str!(concat!(env!("OUT_DIR"), "/fused_layer_norm.ptx"));
+pub const FUSED_RMS_NORM: &str = include_str!(concat!(env!("OUT_DIR"), "/fused_rms_norm.ptx"));
 pub const FUSED_ROPE: &str = include_str!(concat!(env!("OUT_DIR"), "/fused_rope.ptx"));
 pub const KVCONCAT: &str = include_str!(concat!(env!("OUT_DIR"), "/kvconcat.ptx"));
