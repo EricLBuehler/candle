@@ -188,11 +188,10 @@ impl RotaryEmbedding {
         k: &mut Tensor,
     ) -> Result<()> {
         dbg!(q.mean_all());
-        /*
-        q = self.apply_rotary_emb(&*q, positions)?;
+        *q = self.apply_rotary_emb(&*q, positions)?;
         *k = self.apply_rotary_emb(&*k, positions)?;
         return Ok(());
-        */
+        
 
         *q = q.contiguous()?;
         *k = k.contiguous()?;
