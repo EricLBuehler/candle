@@ -227,7 +227,7 @@ impl RotaryEmbedding {
             let xs2 = xs.narrow(D::Minus1, last_dim / 2, last_dim - last_dim / 2)?;
             Tensor::cat(&[&xs2.neg()?, &xs1], D::Minus1)
         }
-        let (_b_sz, _h, seq_len, _n_embd) = q.dims4()?;
+        let (b_sz, _h, seq_len, _n_embd) = x.dims4()?;
         let mut embeds = Vec::new();
         for (b, seqlen_offset) in zip(0..b_sz, seqlen_offsets) {
             let cos = self.cos.narrow(0, *seqlen_offset, seq_len)?;
