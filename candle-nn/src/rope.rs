@@ -222,11 +222,12 @@ impl RotaryEmbedding {
 
     fn apply_rotary_emb(&self, x: &Tensor, seqlen_offsets: &[usize]) -> Result<Tensor> {
         let (b_sz_seq_len, n_head, n_embd) = x.dims3()?;
+        let alt = x.reshape((1, b_sz_seq_len, n_embd, n_head))?;
         let x = x.reshape((1, n_head, b_sz_seq_len, n_embd))?;
-        dbg!(x.shape());
-        dbg!(&x.i(0).unwrap().to_vec3::<half::bf16>()?[0][0][0..10]);
-        dbg!(&x.i(0).unwrap().to_vec3::<half::bf16>()?[2][0][0..10]);
-        dbg!(&x.i(0).unwrap().to_vec3::<half::bf16>()?[2][2][0..10]);
+        dbg!(alt.shape());
+        dbg!(&alt.i(0).unwrap().to_vec3::<half::bf16>()?[0][0][0..10]);
+        dbg!(&alt.i(0).unwrap().to_vec3::<half::bf16>()?[2][0][0..10]);
+        dbg!(&alt.i(0).unwrap().to_vec3::<half::bf16>()?[2][2][0..10]);
         let (b_sz, n_head, seq_len, n_embd) = x.dims4()?;
         let mut ropes = Vec::new();
         let x = x.reshape((b_sz, n_head, seq_len, n_embd / 2, 2))?;
