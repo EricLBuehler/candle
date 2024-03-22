@@ -225,9 +225,9 @@ impl RotaryEmbedding {
         //let alt = x.reshape((1, b_sz_seq_len, n_head, n_embd))?;
         //let alt = alt.permute((0,1,3,2))?;
         let x = x.reshape((1, b_sz_seq_len, n_head, n_embd))?;
-        let x = x.permute((0,2,1,3))?;
         dbg!(&x);
         dbg!(&x.i(0).unwrap().to_vec3::<half::bf16>()?[0][0][0..9]);
+        let x = x.permute((0,2,1,3))?;
         //let x = x.reshape((1, n_head, b_sz_seq_len, n_embd))?; ---
         /*dbg!(alt.shape());
         dbg!(&alt.i(0).unwrap().to_vec3::<half::bf16>()?[0][0][0..10]);
