@@ -235,7 +235,7 @@ impl RotaryEmbedding {
             let cos = cos.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
             let sin = sin.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
             let x_b = x.i(b)?.unsqueeze(0)?;
-            let embed = (x_b.broadcast_mul(&Tensor::cat(&[cos.clone(), cos.clone()], D::Minus1)?) + rotate_half(&x_b)?.broadcast_mul(&Tensor::cat(&[sin.clone(), sin.clone()], D::Minus1)?))?;
+            let embed = (x_b.broadcast_mul(&Tensor::cat(&[cos.clone(), cos.clone()], D::Minus1)?)? + rotate_half(&x_b)?.broadcast_mul(&Tensor::cat(&[sin.clone(), sin.clone()], D::Minus1)?)?)?;
             embeds.push(embed);
         }
         Tensor::cat(&embeds,0)
