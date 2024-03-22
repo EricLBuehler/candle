@@ -54,9 +54,25 @@ impl RotaryEmbedding {
         dbg!(dtype);
         Ok(Self {
             head_size: head_dim,
-            cos: cos.clone().to_dtype(dtype)?,
-            sin: sin.clone().to_dtype(dtype)?,
-            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?.contiguous()?.to_dtype(dtype)?,
+            cos: if is_gpt_neox {
+                Tensor::cat(
+                    &[cos.clone().to_dtype(dtype)?, cos.clone().to_dtype(dtype)?],
+                    D::Minus1,
+                )?
+            } else {
+                cos.clone().to_dtype(dtype)?
+            },
+            sin: if is_gpt_neox {
+                Tensor::cat(
+                    &[sin.clone().to_dtype(dtype)?, sin.clone().to_dtype(dtype)?],
+                    D::Minus1,
+                )?
+            } else {
+                sin.clone().to_dtype(dtype)?
+            },
+            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?
+                .contiguous()?
+                .to_dtype(dtype)?,
             is_gpt_neox,
         })
     }
@@ -171,7 +187,12 @@ impl RotaryEmbedding {
                         cache_storage,
                         pos_storage,
                     ),
-                    _ => candle::bail!("DType mismatch in fused RotaryEmbedding q={:?}, k={:?}, cache={:?}", q.dtype(), k.dtype(), cache_type),
+                    _ => candle::bail!(
+                        "DType mismatch in fused RotaryEmbedding q={:?}, k={:?}, cache={:?}",
+                        q.dtype(),
+                        k.dtype(),
+                        cache_type
+                    ),
                 }
             }
             _ => unreachable!(),
@@ -187,91 +208,76 @@ impl RotaryEmbedding {
         q: &mut Tensor,
         k: &mut Tensor,
     ) -> Result<()> {
-        //dbg!(q.mean_all());
-        *q = self.apply_rotary_emb(&*q, positions)?;
-        *k = self.apply_rotary_emb(&*k, positions)?;
-        return Ok(());
-        
-
-        //*q = q.contiguous()?;
-        //*k = k.contiguous()?;
-        //let old_dtype = q.dtype();
-        //*q = q.to_dtype(DType::F32)?;
-        //*k = k.to_dtype(DType::F32)?;
-        //dbg!(q.mean_all());
-        //dbg!(q.to_dtype(DType::BF16)?.mean_all());
         match (q.device(), k.device()) {
-            
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
                 self.fused_rope(dev, positions_kernel, &*q, &*k)?;
             }
-            
 
             _ => {
                 *q = self.apply_rotary_emb(&*q, positions)?;
                 *k = self.apply_rotary_emb(&*k, positions)?;
             }
         };
-        //*q = q.to_dtype(old_dtype)?;
-        //*k = k.to_dtype(old_dtype)?;
-        //*q = q.contiguous()?;
-        //*k = k.contiguous()?;
         Ok(())
     }
 
     fn apply_rotary_emb(&self, x: &Tensor, seqlen_offsets: &[usize]) -> Result<Tensor> {
+        let (b_sz_seq_len, h, n_embd) = x.dims3()?;
+        let x = x.reshape((1, b_sz_seq_len, h, n_embd))?.transpose(1, 2)?;
+
         fn rotate_half(xs: &Tensor) -> Result<Tensor> {
             let last_dim = xs.dim(D::Minus1)?;
             let xs1 = xs.narrow(D::Minus1, 0, last_dim / 2)?;
             let xs2 = xs.narrow(D::Minus1, last_dim / 2, last_dim - last_dim / 2)?;
             Tensor::cat(&[&xs2.neg()?, &xs1], D::Minus1)
         }
-        let (b_sz_seq_len, h, n_embd) = x.dims3()?;
-        let x = x.reshape((1, b_sz_seq_len, h, n_embd))?.transpose(1,2)?;
         let (b_sz, _h, seq_len, _n_embd) = x.dims4()?;
-        let mut embeds = Vec::new();
-        for (b, seqlen_offset) in zip(0..b_sz, seqlen_offsets) {
-            let cos = self.cos.narrow(0, *seqlen_offset, seq_len)?;
-            let sin = self.sin.narrow(0, *seqlen_offset, seq_len)?;
-            let cos = cos.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
-            let sin = sin.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
-            let x_b = x.i(b)?.unsqueeze(0)?;
-            let embed = (x_b.broadcast_mul(&Tensor::cat(&[cos.clone(), cos.clone()], D::Minus1)?)? + rotate_half(&x_b)?.broadcast_mul(&Tensor::cat(&[sin.clone(), sin.clone()], D::Minus1)?)?)?;
-            embeds.push(embed);
+        if self.is_gpt_neox {
+            let mut embeds = Vec::new();
+            for (b, seqlen_offset) in zip(0..b_sz, seqlen_offsets) {
+                let cos = self.cos.narrow(0, *seqlen_offset, seq_len)?;
+                let sin = self.sin.narrow(0, *seqlen_offset, seq_len)?;
+                let cos = cos.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
+                let sin = sin.unsqueeze(0)?.unsqueeze(0)?; // (1, 1, seq_len, dim)
+                let x_b = x.i(b)?.unsqueeze(0)?;
+                let embed = (x_b.broadcast_mul(&cos)? + rotate_half(&x_b)?.broadcast_mul(&sin)?)?;
+                embeds.push(embed);
+            }
+            Tensor::cat(&embeds, 0)
+        } else {
+            let mut ropes = Vec::new();
+            let x = x.reshape((b_sz, n_head, seq_len, n_embd / 2, 2))?;
+            for (b, seqlen_offset) in zip(0..b_sz, seqlen_offsets) {
+                let cos = self.cos.narrow(0, *seqlen_offset, seq_len)?.reshape((
+                    seq_len,
+                    n_embd / 2,
+                    1,
+                ))?;
+                let sin = self.sin.narrow(0, *seqlen_offset, seq_len)?.reshape((
+                    seq_len,
+                    n_embd / 2,
+                    1,
+                ))?;
+                let cos = cos.broadcast_as((1, 1, seq_len, n_embd / 2, 1))?;
+                let sin = sin.broadcast_as((1, 1, seq_len, n_embd / 2, 1))?;
+                // This mimics the llama.cpp behavior.
+                // https://github.com/ggerganov/llama.cpp/blob/1f0bccb27929e261744c979bc75114955da49e98/ggml.c#L12104-L12105
+                // The x0 and x1 value are interleaved on the n_embd (= head_dim) dimension.
+                // The resulting y0 and y1 are also interleaved with:
+                //   y0 = x0*cos - x1*sin
+                //   y1 = x0*sin + x1*cos
+                let x_b = x.i(b)?.unsqueeze(0)?;
+                let x_b = x_b.reshape((1, n_head, seq_len, n_embd / 2, 2))?;
+                let x0 = x_b.narrow(D::Minus1, 0, 1)?;
+                let x1 = x_b.narrow(D::Minus1, 1, 1)?;
+                let y0 = (x0.broadcast_mul(&cos)? - x1.broadcast_mul(&sin)?)?;
+                let y1 = (x0.broadcast_mul(&sin)? + x1.broadcast_mul(&cos)?)?;
+                let rope = Tensor::cat(&[y0, y1], D::Minus1)?;
+                let rope = rope.flatten_from(D::Minus2)?;
+                ropes.push(rope);
+            }
+            Tensor::cat(&ropes, 0)
         }
-        Tensor::cat(&embeds,0)
-
-        /*let (b_sz, n_head, seq_len, n_embd) = x.dims4()?;
-        let mut ropes = Vec::new();
-        let x = x.reshape((b_sz, n_head, seq_len, n_embd / 2, 2))?;
-        for (b, seqlen_offset) in zip(0..b_sz, seqlen_offsets) {
-            let cos =
-                self.cos
-                    .narrow(0, *seqlen_offset, seq_len)?
-                    .reshape((seq_len, n_embd / 2, 1))?;
-            let sin =
-                self.sin
-                    .narrow(0, *seqlen_offset, seq_len)?
-                    .reshape((seq_len, n_embd / 2, 1))?;
-            let cos = cos.broadcast_as((1, 1, seq_len, n_embd / 2, 1))?;
-            let sin = sin.broadcast_as((1, 1, seq_len, n_embd / 2, 1))?;
-            // This mimics the llama.cpp behavior.
-            // https://github.com/ggerganov/llama.cpp/blob/1f0bccb27929e261744c979bc75114955da49e98/ggml.c#L12104-L12105
-            // The x0 and x1 value are interleaved on the n_embd (= head_dim) dimension.
-            // The resulting y0 and y1 are also interleaved with:
-            //   y0 = x0*cos - x1*sin
-            //   y1 = x0*sin + x1*cos
-            let x_b = x.i(b)?.unsqueeze(0)?;
-            let x_b = x_b.reshape((1, n_head, seq_len, n_embd / 2, 2))?;
-            let x0 = x_b.narrow(D::Minus1, 0, 1)?;
-            let x1 = x_b.narrow(D::Minus1, 1, 1)?;
-            let y0 = (x0.broadcast_mul(&cos)? - x1.broadcast_mul(&sin)?)?;
-            let y1 = (x0.broadcast_mul(&sin)? + x1.broadcast_mul(&cos)?)?;
-            let rope = Tensor::cat(&[y0, y1], D::Minus1)?;
-            let rope = rope.flatten_from(D::Minus2)?;
-            ropes.push(rope);
-        }
-        Tensor::cat(&ropes, 0)*/
     }
 }
