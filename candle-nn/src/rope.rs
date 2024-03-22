@@ -221,8 +221,8 @@ impl RotaryEmbedding {
     }
 
     fn apply_rotary_emb(&self, x: &Tensor, seqlen_offsets: &[usize]) -> Result<Tensor> {
-        let (b_sz, seq_len, n_head_n_embd) = x.dims3()?;
-        let x = x.reshape((b_sz, n_head_n_embd/self.head_size, seq_len, self.head_size))?;
+        let (b_sz_seq_len, n_head, n_embd) = x.dims3()?;
+        let x = x.reshape((1, n_head, b_sz_seq_len, n_embd))?;
         dbg!(x.shape());
         dbg!(&x.i(0).unwrap().to_vec3::<half::bf16>()?[0][0][0..10]);
         dbg!(&x.i(0).unwrap().to_vec3::<half::bf16>()?[2][0][0..10]);
