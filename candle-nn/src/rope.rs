@@ -224,6 +224,7 @@ impl RotaryEmbedding {
         let (b_sz, seq_len, n_head_n_embd) = x.dims3()?;
         let x = x.reshape((b_sz, n_head_n_embd/self.head_size, seq_len, self.head_size))?;
         dbg!(x.shape());
+        dbg!(x.i(0).unwrap().to_vec3()?[0][0][0..10]);
         let (b_sz, n_head, seq_len, n_embd) = x.dims4()?;
         let mut ropes = Vec::new();
         let x = x.reshape((b_sz, n_head, seq_len, n_embd / 2, 2))?;
