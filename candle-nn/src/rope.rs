@@ -33,7 +33,6 @@ impl RotaryEmbedding {
         is_gpt_neox: bool,
         dtype: DType,
     ) -> Result<Self> {
-        let max_position_embeddings = 4096;
         dbg!(base);
         dbg!(head_dim);
         dbg!(max_position_embeddings);
@@ -154,7 +153,7 @@ impl RotaryEmbedding {
                         cache_storage,
                         pos_storage,
                     ),
-                    (DType::F32, DType::F32, DType::F32) => self.execute_dtype::<f32>(
+                    (DType::F32, DType::F32, DType::F32) => self.execute_dtype::<f64>(
                         &dev,
                         q_storage,
                         k_storage,
