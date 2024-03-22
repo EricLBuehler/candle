@@ -153,7 +153,7 @@ impl RotaryEmbedding {
                         cache_storage,
                         pos_storage,
                     ),
-                    (DType::F32, DType::F32, DType::F32) => self.execute_dtype::<f64>(
+                    (DType::F32, DType::F32, DType::F32) => self.execute_dtype::<f32>(
                         &dev,
                         q_storage,
                         k_storage,
