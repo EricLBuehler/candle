@@ -74,12 +74,12 @@ impl RotaryEmbedding {
     ) -> Result<()> {
         use candle::cuda_backend::WrapErr;
 
-        let num_tokens = q.elem_count() / q.dim(D::Minus1)?;
+        let num_tokens = q.dim(0)?;
         let rot_dim = self.cache.dim(1)?;
-        let num_heads = q.dim(D::Minus1)? / self.head_size;
-        let num_kv_heads = k.dim(D::Minus1)? / self.head_size;
-        let q_stride = q.stride()[q.stride().len() - 2];
-        let k_stride = k.stride()[k.stride().len() - 2];
+        let num_heads = q.dim(1)?;
+        let num_kv_heads = k.dim(1)?;
+        let q_stride = q.stride()[0];
+        let k_stride = k.stride()[0];
 
         let func = dev.get_or_load_func(
             &if self.is_gpt_neox {
@@ -92,7 +92,7 @@ impl RotaryEmbedding {
 
         let cfg = LaunchConfig {
             grid_dim: (num_tokens as u32, 1, 1),
-            block_dim: (512.min((num_heads * rot_dim / 2) as u32), 1, 1),
+            block_dim: (512.min((num_heads * rot_dim) as u32), 1, 1),
             shared_mem_bytes: 0,
         };
 
