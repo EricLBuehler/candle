@@ -187,14 +187,14 @@ impl RotaryEmbedding {
         q: &mut Tensor,
         k: &mut Tensor,
     ) -> Result<()> {
-        dbg!(q.mean_all());
+        //dbg!(q.mean_all());
         /* *q = self.apply_rotary_emb(&*q, positions)?;
         *k = self.apply_rotary_emb(&*k, positions)?;
         return Ok(());*/
         
 
-        *q = q.contiguous()?;
-        *k = k.contiguous()?;
+        //*q = q.contiguous()?;
+        //*k = k.contiguous()?;
         //let old_dtype = q.dtype();
         //*q = q.to_dtype(DType::F32)?;
         //*k = k.to_dtype(DType::F32)?;
@@ -215,8 +215,8 @@ impl RotaryEmbedding {
         };
         //*q = q.to_dtype(old_dtype)?;
         //*k = k.to_dtype(old_dtype)?;
-        *q = q.contiguous()?;
-        *k = k.contiguous()?;
+        //*q = q.contiguous()?;
+        //*k = k.contiguous()?;
         Ok(())
     }
 
