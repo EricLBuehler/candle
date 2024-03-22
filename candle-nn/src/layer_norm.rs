@@ -161,8 +161,6 @@ pub fn layer_norm<C: Into<LayerNormConfig>>(
     } else {
         None
     };
-    dbg!(&weight);
-    dbg!(&bias);
     Ok(LayerNorm {
         weight: weight.clone(),
         bias: bias.unwrap_or(Tensor::zeros_like(&weight)?),

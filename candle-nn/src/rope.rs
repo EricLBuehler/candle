@@ -239,6 +239,7 @@ impl RotaryEmbedding {
             //   y0 = x0*cos - x1*sin
             //   y1 = x0*sin + x1*cos
             let x_b = x.i(b)?.unsqueeze(0)?;
+            let x_b = x_b.reshape((1, n_head, seq_len, n_embd / 2, 2))?;
             let x0 = x_b.narrow(D::Minus1, 0, 1)?;
             let x1 = x_b.narrow(D::Minus1, 1, 1)?;
             let y0 = (x0.broadcast_mul(&cos)? - x1.broadcast_mul(&sin)?)?;
