@@ -200,6 +200,7 @@ impl RotaryEmbedding {
         positions_kernel: &Tensor,
         q: &mut Tensor,
         k: &mut Tensor,
+        b_sz: usize,
     ) -> Result<()> {
         match (q.device(), k.device()) {
             #[cfg(feature = "cuda")]
@@ -208,16 +209,23 @@ impl RotaryEmbedding {
             }
 
             _ => {
-                *q = self.apply_rotary_emb(&*q, positions)?;
-                *k = self.apply_rotary_emb(&*k, positions)?;
+                *q = self.apply_rotary_emb(&*q, positions, b_sz)?;
+                *k = self.apply_rotary_emb(&*k, positions, b_sz)?;
             }
         };
         Ok(())
     }
 
-    fn apply_rotary_emb(&self, x: &Tensor, seqlen_offsets: &[usize]) -> Result<Tensor> {
+    fn apply_rotary_emb(
+        &self,
+        x: &Tensor,
+        seqlen_offsets: &[usize],
+        b_sz: usize,
+    ) -> Result<Tensor> {
         let (b_sz_seq_len, h, n_embd) = x.dims3()?;
-        let x = x.reshape((1, b_sz_seq_len, h, n_embd))?.transpose(1, 2)?;
+        let x = x
+            .reshape((b_sz, b_sz_seq_len / b_sz, h, n_embd))?
+            .transpose(1, 2)?;
 
         fn rotate_half(xs: &Tensor) -> Result<Tensor> {
             let last_dim = xs.dim(D::Minus1)?;
