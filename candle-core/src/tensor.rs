@@ -1365,7 +1365,7 @@ impl Tensor {
             }
             .bt())?
         }
-        let mut storage = self.device().alloc_impl(self.shape(), self.dtype(), None)?;
+        let mut storage = self.device().alloc(self.shape(), self.dtype(), None)?;
         self.storage()
             .copy_strided_src(&mut storage, 0, self.layout())?;
         let offset = start * src.dims()[1..].iter().product::<usize>();
@@ -2037,7 +2037,7 @@ impl Tensor {
     /// copied.
     pub(crate) fn make_var(&self) -> Result<Tensor> {
         let shape = self.shape().clone();
-        let mut storage = self.device().alloc_impl(&shape, self.dtype(), None)?;
+        let mut storage = self.device().alloc(&shape, self.dtype(), None)?;
         self.storage()
             .copy_strided_src(&mut storage, 0, self.layout())?;
         Ok(from_storage(storage, shape, BackpropOp::none(), true))

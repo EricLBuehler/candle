@@ -139,7 +139,7 @@ impl Tensor {
         }
         let shape = Shape::from(cat_dims);
         let op = crate::op::BackpropOp::new(args, |args| crate::op::Op::Cat(args, 0));
-        let mut storage = device.alloc_impl(&shape, dtype, None)?;
+        let mut storage = device.alloc(&shape, dtype, None)?;
         for (arg, &offset) in args.iter().zip(offsets.iter()) {
             let arg = arg.as_ref();
             arg.storage()
@@ -213,7 +213,7 @@ impl Tensor {
         let block_size: usize = cat_dims.iter().skip(1 + dim).product();
         let shape = Shape::from(cat_dims);
         let op = crate::op::BackpropOp::new(args, |args| crate::op::Op::Cat(args, dim));
-        let mut storage = device.alloc_impl(&shape, dtype, None)?;
+        let mut storage = device.alloc(&shape, dtype, None)?;
         let mut dst_o = 0;
         for arg in args.iter() {
             let arg = arg.as_ref();
