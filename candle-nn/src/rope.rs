@@ -33,9 +33,6 @@ impl RotaryEmbedding {
         is_gpt_neox: bool,
         dtype: DType,
     ) -> Result<Self> {
-        dbg!(base);
-        dbg!(head_dim);
-        dbg!(max_position_embeddings);
         let theta: Vec<_> = (0..head_dim)
             .step_by(2)
             .map(|i| 1f32 / base.powf(i as f32 / head_dim as f32))
@@ -48,10 +45,6 @@ impl RotaryEmbedding {
             .matmul(&theta)?;
         let cos = idx_theta.cos()?;
         let sin = idx_theta.sin()?;
-        dbg!(cos.mean_all());
-        dbg!(cos.to_dtype(DType::BF16)?.mean_all());
-        dbg!(cos.shape());
-        dbg!(dtype);
         Ok(Self {
             head_size: head_dim,
             cos: if is_gpt_neox {
