@@ -1445,7 +1445,7 @@ impl BackendStorage for CudaStorage {
             // Make the kernel contiguous if not already the case.
             let mut kernel_c = unsafe {
                 self.device()
-                    .alloc_uninit(kernel_l.shape(), kernel.dtype())?
+                    .alloc_impl(kernel_l.shape(), kernel.dtype(), None)?
             };
             kernel.copy_strided_src(&mut kernel_c, 0, kernel_l)?;
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
@@ -1454,7 +1454,7 @@ impl BackendStorage for CudaStorage {
             col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
         };
         let res_l = Layout::contiguous((b, l_out, n)).transpose(1, 2)?;
-        let mut res_t = unsafe { self.device().alloc_uninit(res_l.shape(), res.dtype())? };
+        let mut res_t = unsafe { self.device().alloc_impl(res_l.shape(), res.dtype(), None)? };
         res.copy_strided_src(&mut res_t, 0, &res_l)?;
         Ok(res_t)
     }
@@ -1513,7 +1513,7 @@ impl BackendStorage for CudaStorage {
             // Make the kernel contiguous if not already the case.
             let mut kernel_c = unsafe {
                 self.device()
-                    .alloc_uninit(kernel_l.shape(), kernel.dtype())?
+                    .alloc_impl(kernel_l.shape(), kernel.dtype(), None)?
             };
             kernel.copy_strided_src(&mut kernel_c, 0, kernel_l)?;
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
@@ -1524,7 +1524,7 @@ impl BackendStorage for CudaStorage {
         let res_l = Layout::contiguous((b, h_out, w_out, n))
             .transpose(1, 2)?
             .transpose(1, 3)?;
-        let mut res_t = unsafe { self.device().alloc_uninit(res_l.shape(), res.dtype())? };
+        let mut res_t = unsafe { self.device().alloc_impl(res_l.shape(), res.dtype(), None)? };
         res.copy_strided_src(&mut res_t, 0, &res_l)?;
         Ok(res_t)
     }
@@ -1661,7 +1661,7 @@ impl BackendStorage for CudaStorage {
         dim: usize,
     ) -> Result<Self> {
         let device = self.device().clone();
-        let mut acc = unsafe { device.alloc_uninit(l.shape(), self.dtype())? };
+        let mut acc = unsafe { device.alloc_impl(l.shape(), self.dtype(), None)? };
         self.copy_strided_src(&mut acc, 0, l)?;
         ScatterAdd(ids, ids_l, dim).map(&mut acc.slice, l.shape(), &src.slice, src_l, &device)?;
         Ok(acc)
@@ -1676,7 +1676,7 @@ impl BackendStorage for CudaStorage {
         dim: usize,
     ) -> Result<Self> {
         let device = self.device().clone();
-        let mut acc = unsafe { device.alloc_uninit(l.shape(), self.dtype())? };
+        let mut acc = unsafe { device.alloc_impl(l.shape(), self.dtype(), None)? };
         self.copy_strided_src(&mut acc, 0, l)?;
         IndexAdd(ids, ids_l, dim).map(&mut acc.slice, l.shape(), &src.slice, src_l, &device)?;
         Ok(acc)
