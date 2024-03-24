@@ -264,7 +264,7 @@ impl RmsNorm {
 
 impl crate::Module for RmsNorm {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
-        #[cfg(feature = "cuda")]
+        /*#[cfg(feature = "cuda")]
         {
             dbg!(&xs);
             dbg!(&xs.is_contiguous());
@@ -278,9 +278,9 @@ impl crate::Module for RmsNorm {
             res.reshape((bs, s, h))?.contiguous()
         }
         #[cfg(not(feature = "cuda"))]
-        {
+        {*/
             self.0.forward(xs)
-        }
+        //}
     }
 }
 
