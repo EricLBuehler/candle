@@ -264,13 +264,13 @@ impl RmsNorm {
 
 impl crate::Module for RmsNorm {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
-        #[cfg(feature = "cuda")]
+        /*#[cfg(feature = "cuda")]
         match (xs.dtype(), xs.device()) {
             (DType::BF16, Device::Cuda(dev))
             | (DType::F32, Device::Cuda(dev))
             | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
             _ => {}
-        };
+        };*/
 
         self.0.forward(xs)
     }
