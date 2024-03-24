@@ -21,6 +21,7 @@ safetensors = { workspace = true }
 serde = { workspace = true }
 metal = { workspace = true, optional = true }
 candle-metal-kernels = { workspace = true, optional = true }
+candle-layer-norm = { git = "https://github.com/huggingface/candle-layer-norm.git", version = "0.0.1" }
 
 [dev-dependencies]
 anyhow = { workspace = true }

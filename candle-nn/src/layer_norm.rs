@@ -271,7 +271,9 @@ impl crate::Module for RmsNorm {
             | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
             _ => {}
         };*/
-
+        #[cfg(feature = "cuda")]
+        candle_layer_norm::rms_norm(xs, self.0.weight(), None, self.0.eps as f32)
+        #[cfg(not(feature = "cuda"))]
         self.0.forward(xs)
     }
 }
