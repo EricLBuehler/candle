@@ -266,11 +266,15 @@ impl crate::Module for RmsNorm {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
         #[cfg(feature = "cuda")]
         {
+            dbg!(&xs);
+            dbg!(&xs.is_contiguous());
             let (bs, s, h) = xs.dims3()?;
             let xs = xs.reshape((bs * s, h))?.contiguous()?;
             dbg!(&xs);
+            dbg!(&xs.is_contiguous());
             let res = candle_layer_norm::rms_norm(&xs, self.0.weight(), None, self.0.eps as f32)?;
             dbg!(&res);
+            dbg!(&res.is_contiguous());
             res.reshape((bs, s, h))?.contiguous()
         }
         #[cfg(not(feature = "cuda"))]
