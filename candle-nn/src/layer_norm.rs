@@ -267,7 +267,7 @@ impl crate::Module for RmsNorm {
         #[cfg(feature = "cuda")]
         {
             let (bs, s, h) = xs.dims3()?;
-            let xs = xs.reshape((bs * s, h))?;
+            let xs = xs.reshape((bs * s, h))?.contiguous()?;
             let res = candle_layer_norm::rms_norm(&xs, self.0.weight(), None, self.0.eps as f32)?;
             res.reshape((bs, s, h))
         }
