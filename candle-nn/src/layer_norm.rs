@@ -264,22 +264,17 @@ impl RmsNorm {
 
 impl crate::Module for RmsNorm {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
-        /*#[cfg(feature = "cuda")]
-        match (xs.dtype(), xs.device()) {
-            (DType::BF16, Device::Cuda(dev))
-            | (DType::F32, Device::Cuda(dev))
-            | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
-            _ => {}
-        };*/
         #[cfg(feature = "cuda")]
         {
             let (bs, s, h) = xs.dims3()?;
-            let xs = xs.reshape((bs*s, h))?;
+            let xs = xs.reshape((bs * s, h))?;
             let res = candle_layer_norm::rms_norm(&xs, self.0.weight(), None, self.0.eps as f32)?;
             res.reshape((bs, s, h))
         }
         #[cfg(not(feature = "cuda"))]
-        { self.0.forward(xs) }
+        {
+            self.0.forward(xs)
+        }
     }
 }
 
