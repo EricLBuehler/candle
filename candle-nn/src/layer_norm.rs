@@ -272,9 +272,9 @@ impl crate::Module for RmsNorm {
             _ => {}
         };*/
         #[cfg(feature = "cuda")]
-        candle_layer_norm::rms_norm(xs, self.0.weight(), None, self.0.eps as f32)
+        { candle_layer_norm::rms_norm(xs, self.0.weight(), None, self.0.eps as f32) }
         #[cfg(not(feature = "cuda"))]
-        self.0.forward(xs)
+        { self.0.forward(xs) }
     }
 }
 
