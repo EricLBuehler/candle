@@ -268,7 +268,7 @@ impl RmsNorm {
             let xs = xs.reshape((bs * s, h))?;
             let res = candle_layer_norm::rms_norm(&xs, self.0.weight(), None, self.0.eps as f32)?;
             res.reshape((bs, s, h))
-        } else*/ {
+        } else {*/
             match (xs.dtype(), xs.device()) {
                 (DType::BF16, Device::Cuda(dev))
                 | (DType::F32, Device::Cuda(dev))
