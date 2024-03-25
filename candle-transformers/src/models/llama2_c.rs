@@ -1,7 +1,7 @@
 use candle::{DType, Device, IndexOp, Result, Tensor, D};
 use candle_nn::layer_norm::RmsNormNonQuantized;
 use candle_nn::linear_no_bias as linear;
-use candle_nn::{embedding, rms_norm, Embedding, Linear, Module, RmsNorm, VarBuilder};
+use candle_nn::{embedding, rms_norm_non_quant, Embedding, Linear, Module, RmsNorm, VarBuilder};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]

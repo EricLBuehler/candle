@@ -1,5 +1,5 @@
 use candle::{DType, Device, Error as E, IndexOp, Module, Result, Tensor, D};
-use candle_nn::{embedding, linear_b, rms_norm, Embedding, Linear, RmsNorm, VarBuilder};
+use candle_nn::{embedding, linear_b, rms_norm_non_quant, Embedding, Linear, RmsNorm, VarBuilder};
 
 // Equivalent to torch.repeat_interleave
 pub(crate) fn repeat_interleave(img: &Tensor, repeats: usize, dim: usize) -> Result<Tensor> {
@@ -328,6 +328,8 @@ pub mod tokenizers {
 }
 
 pub mod gpt {
+    use candle_nn::layer_norm::RmsNormNonQuantized;
+
     use super::*;
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -400,7 +402,7 @@ pub mod gpt {
         fn new(cfg: &Config, vb: VarBuilder) -> Result<Self> {
             match cfg.norm_type {
                 NormType::RMSNorm => {
-                    let rms_norm = candle_nn::rms_norm(cfg.n_embd, cfg.rmsnorm_eps, vb)?;
+                    let rms_norm = candle_nn::rms_norm_non_quant(cfg.n_embd, cfg.rmsnorm_eps, vb)?;
                     Ok(Self::RMSNorm(rms_norm))
                 }
                 NormType::LayerNorm => {
