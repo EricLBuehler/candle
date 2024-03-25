@@ -156,7 +156,7 @@ impl MambaBlock {
 #[derive(Clone, Debug)]
 pub struct ResidualBlock {
     mixer: MambaBlock,
-    norm: RmsNorm,
+    norm: RmsNorm<RmsNormNonQuantized>,
 }
 
 impl ResidualBlock {

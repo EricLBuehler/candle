@@ -1,4 +1,5 @@
 use candle::{DType, Device, IndexOp, Result, Tensor, D};
+use candle_nn::layer_norm::RmsNormNonQuantized;
 use candle_nn::linear_no_bias as linear;
 use candle_nn::{embedding, rms_norm, Embedding, Linear, Module, RmsNorm, VarBuilder};
 use std::collections::HashMap;
@@ -282,14 +283,14 @@ impl Mlp {
 
 #[derive(Debug, Clone)]
 struct Block {
-    rms_1: RmsNorm,
+    rms_1: RmsNorm<RmsNormNonQuantized>,
     attn: CausalSelfAttention,
-    rms_2: RmsNorm,
+    rms_2: RmsNorm<RmsNormNonQuantized>,
     mlp: Mlp,
 }
 
 impl Block {
-    fn new(rms_1: RmsNorm, attn: CausalSelfAttention, rms_2: RmsNorm, mlp: Mlp) -> Self {
+    fn new(rms_1: RmsNorm<RmsNormNonQuantized>, attn: CausalSelfAttention, rms_2: RmsNorm<RmsNormNonQuantized>, mlp: Mlp) -> Self {
         Self {
             rms_1,
             attn,
@@ -332,7 +333,7 @@ impl Block {
 pub struct Llama {
     wte: Embedding,
     blocks: Vec<Block>,
-    ln_f: RmsNorm,
+    ln_f: RmsNorm<RmsNormNonQuantized>,
     lm_head: Linear,
     pub config: Config,
 }

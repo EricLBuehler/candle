@@ -170,14 +170,14 @@ pub fn layer_norm<C: Into<candle_nn::LayerNormConfig>>(
 
 #[derive(Debug, Clone)]
 pub struct RmsNorm {
-    inner: candle_nn::RmsNorm,
+    inner: candle_nn::RmsNorm<RmsNormNonQuantized>,
     span: tracing::Span,
 }
 
 impl RmsNorm {
     pub fn new(size: usize, eps: f64, vb: VarBuilder) -> Result<Self> {
         let span = tracing::span!(tracing::Level::TRACE, "rms-norm");
-        let inner = candle_nn::rms_norm(size, eps, vb)?;
+        let inner = candle_nn::rms_norm_non_quant(size, eps, vb)?;
         Ok(Self { inner, span })
     }
 }

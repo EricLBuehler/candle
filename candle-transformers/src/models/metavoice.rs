@@ -350,7 +350,7 @@ pub mod gpt {
     }
 
     enum Norm {
-        RMSNorm(candle_nn::RmsNorm),
+        RMSNorm(candle_nn::RmsNorm<RmsNormNonQuantized>),
         LayerNorm(candle_nn::LayerNorm),
     }
 
@@ -666,6 +666,8 @@ pub mod gpt {
 }
 
 pub mod transformer {
+    use candle_nn::layer_norm::RmsNormNonQuantized;
+
     use super::*;
 
     #[derive(Debug, Clone, serde::Deserialize)]
@@ -833,8 +835,8 @@ pub mod transformer {
     struct Block {
         attention: Attention,
         feed_forward: FeedForward,
-        ffn_norm: RmsNorm,
-        attention_norm: RmsNorm,
+        ffn_norm: RmsNorm<RmsNormNonQuantized>,
+        attention_norm: RmsNorm<RmsNormNonQuantized>,
         span: tracing::Span,
     }
 
@@ -871,7 +873,7 @@ pub mod transformer {
         pos_embeddings: Embedding,
         speaker_cond_pos: Linear,
         layers: Vec<Block>,
-        norm: RmsNorm,
+        norm: RmsNorm<RmsNormNonQuantized>,
         output: Linear,
         spk_cond_mask: Tensor,
         span: tracing::Span,
