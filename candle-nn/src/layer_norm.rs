@@ -47,7 +47,7 @@ use candle::{
     WithDType,
 };
 
-use candle::{DType, Result, Tensor, D};
+use candle::{DType, Result, Tensor, D, Module};
 
 #[cfg(feature = "cuda")]
 static MAX_GRID_Y: Mutex<Option<u32>> = Mutex::new(None);
