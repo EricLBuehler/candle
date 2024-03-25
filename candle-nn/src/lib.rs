@@ -30,7 +30,9 @@ pub use embedding::{embedding, Embedding};
 pub use func::{func, func_t, Func, FuncT};
 pub use group_norm::{group_norm, GroupNorm};
 pub use init::Init;
-pub use layer_norm::{layer_norm, rms_norm, LayerNorm, LayerNormConfig, RmsNorm};
+pub use layer_norm::{
+    layer_norm, rms_norm_non_quant, rms_norm_quant, LayerNorm, LayerNormConfig, RmsNorm,
+};
 pub use linear::{linear, linear_b, linear_no_bias, Linear};
 pub use ops::{kvconcat, Dropout};
 pub use optim::{AdamW, Optimizer, ParamsAdamW, SGD};

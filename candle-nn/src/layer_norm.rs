@@ -183,13 +183,19 @@ pub struct RmsNorm<T> {
 
 impl RmsNorm<RmsNormNonQuantized> {
     pub fn new(weight: Tensor, eps: f64) -> Self {
-        Self(LayerNorm::rms_norm(weight, eps))
+        Self {
+            inner: LayerNorm::rms_norm(weight, eps),
+            _ghost: PhantomData,
+        }
     }
 }
 
 impl RmsNorm<RmsNormQuantized> {
     pub fn new(weight: Tensor, eps: f64) -> Self {
-        Self(LayerNorm::rms_norm(weight, eps))
+        Self {
+            inner: LayerNorm::rms_norm(weight, eps),
+            _ghost: PhantomData,
+        }
     }
 
     #[cfg(feature = "cuda")]
@@ -222,7 +228,7 @@ impl RmsNorm<RmsNormQuantized> {
             &out,
             x_storage.as_cuda_slice::<T>()?,
             weight_storage.as_cuda_slice::<T>()?,
-            eps_converter(self.0.eps),
+            eps_converter(self.inner.eps),
             num_tokens as i32,
             hidden_size as i32,
         );
@@ -239,7 +245,7 @@ impl RmsNorm<RmsNormQuantized> {
     fn fused_rmsnorm(&self, x: &Tensor, dev: &CudaDevice) -> Result<Tensor> {
         match (
             &*x.storage_and_layout().0,
-            &*self.0.weight().storage_and_layout().0,
+            &*self.inner.weight().storage_and_layout().0,
         ) {
             (Storage::Cuda(x_storage), Storage::Cuda(weight_storage)) => {
                 match (x_storage.dtype(), weight_storage.dtype()) {
@@ -274,56 +280,71 @@ impl RmsNorm<RmsNormQuantized> {
 
 impl<T> RmsNorm<T> {
     pub fn into_inner(self) -> LayerNorm {
-        self.0
+        self.inner
     }
 }
 
 impl Module for RmsNorm<RmsNormNonQuantized> {
-    fn forward(&self, xs: &Tensor, is_quantized: bool) -> Result<Tensor> {
+    fn forward(&self, xs: &Tensor) -> Result<Tensor> {
         #[cfg(feature = "cuda")]
         {
             let (bs, s, h) = xs.dims3()?;
             let xs = xs.reshape((bs * s, h))?;
-            let res = candle_layer_norm::rms_norm(&xs, self.0.weight(), None, self.0.eps as f32)?;
+            let res =
+                candle_layer_norm::rms_norm(&xs, self.inner.weight(), None, self.inner.eps as f32)?;
             res.reshape((bs, s, h))
         }
         #[cfg(not(feature = "cuda"))]
         {
-            self.0.forward(xs)
+            self.inner.forward(xs)
         }
     }
 }
 
 impl Module for RmsNorm<RmsNormQuantized> {
-    fn forward(&self, xs: &Tensor, is_quantized: bool) -> Result<Tensor> {
+    fn forward(&self, xs: &Tensor) -> Result<Tensor> {
         #[cfg(feature = "cuda")]
         match (xs.dtype(), xs.device()) {
             (DType::BF16, Device::Cuda(dev))
             | (DType::F32, Device::Cuda(dev))
             | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
-            _ => return self.0.forward(xs),
+            _ => return self.inner.forward(xs),
         }
         #[cfg(not(feature = "cuda"))]
         {
-            self.0.forward(xs)
+            self.inner.forward(xs)
         }
     }
 }
 
-pub fn rms_norm_non_quant(size: usize, eps: f64, vb: crate::VarBuilder) -> Result<RmsNorm<RmsNormNonQuantized>> {
+pub fn rms_norm_non_quant(
+    size: usize,
+    eps: f64,
+    vb: crate::VarBuilder,
+) -> Result<RmsNorm<RmsNormNonQuantized>> {
     let config = LayerNormConfig {
         eps,
         remove_mean: false,
         affine: false,
     };
-    Ok(RmsNorm(layer_norm(size, config, vb)?))
+    Ok(RmsNorm {
+        inner: layer_norm(size, config, vb)?,
+        _ghost: PhantomData,
+    })
 }
 
-pub fn rms_norm_quant(size: usize, eps: f64, vb: crate::VarBuilder) -> Result<RmsNorm<RmsNormQuantized>> {
+pub fn rms_norm_quant(
+    size: usize,
+    eps: f64,
+    vb: crate::VarBuilder,
+) -> Result<RmsNorm<RmsNormQuantized>> {
     let config = LayerNormConfig {
         eps,
         remove_mean: false,
         affine: false,
     };
-    Ok(RmsNorm(layer_norm(size, config, vb)?))
+    Ok(RmsNorm {
+        inner: layer_norm(size, config, vb)?,
+        _ghost: PhantomData,
+    })
 }
