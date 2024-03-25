@@ -260,17 +260,22 @@ impl RmsNorm {
             _ => unreachable!(),
         }
     }
-}
 
-impl crate::Module for RmsNorm {
-    fn forward(&self, xs: &Tensor) -> Result<Tensor> {
+    fn forward(&self, xs: &Tensor, is_quantized: bool) -> Result<Tensor> {
         #[cfg(feature = "cuda")]
-        {
+        /*if !is_quantized { // This is a hack. It seems like quantized works without this impl, but it is slower.
             let (bs, s, h) = xs.dims3()?;
             let xs = xs.reshape((bs * s, h))?;
             let res = candle_layer_norm::rms_norm(&xs, self.0.weight(), None, self.0.eps as f32)?;
             res.reshape((bs, s, h))
-        }
+        } else*/ {
+            match (xs.dtype(), xs.device()) {
+                (DType::BF16, Device::Cuda(dev))
+                | (DType::F32, Device::Cuda(dev))
+                | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
+                _ => {}
+            }//;
+        //}
         #[cfg(not(feature = "cuda"))]
         {
             self.0.forward(xs)
