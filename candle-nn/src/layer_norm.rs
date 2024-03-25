@@ -171,7 +171,9 @@ pub fn layer_norm<C: Into<LayerNormConfig>>(
 }
 
 // This whole non quantized/quantized RmsNorm is a hack. It seems like quantized works without this impl, but it is slower.
+#[derive(Clone, Debug)]
 pub struct RmsNormQuantized;
+#[derive(Clone, Debug)]
 pub struct RmsNormNonQuantized;
 
 /// RmsNorm is a specialized version of the LayerNorm module.
