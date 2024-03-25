@@ -260,8 +260,10 @@ impl RmsNorm {
             _ => unreachable!(),
         }
     }
+}
 
-    fn forward(&self, xs: &Tensor, is_quantized: bool) -> Result<Tensor> {
+impl Module for RmsNorm {
+    fn forward(&self, xs: &Tensor) -> Result<Tensor> {
         #[cfg(feature = "cuda")]
         /*if !is_quantized { // This is a hack. It seems like quantized works without this impl, but it is slower.
             let (bs, s, h) = xs.dims3()?;
