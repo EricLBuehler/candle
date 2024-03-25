@@ -29,6 +29,7 @@
 //!
 //! [`Layer Normalization`]: https://arxiv.org/abs/1607.06450
 
+use std::marker::PhantomData;
 #[cfg(feature = "cuda")]
 use std::{
     mem,
@@ -47,7 +48,7 @@ use candle::{
     WithDType,
 };
 
-use candle::{DType, Result, Tensor, D, Module};
+use candle::{DType, Module, Result, Tensor, D};
 
 #[cfg(feature = "cuda")]
 static MAX_GRID_Y: Mutex<Option<u32>> = Mutex::new(None);
@@ -169,17 +170,26 @@ pub fn layer_norm<C: Into<LayerNormConfig>>(
     })
 }
 
+// This whole non quantized/quantized RmsNorm is a hack. It seems like quantized works without this impl, but it is slower.
+pub struct RmsNormQuantized;
+pub struct RmsNormNonQuantized;
+
 /// RmsNorm is a specialized version of the LayerNorm module.
 #[derive(Clone, Debug)]
-pub struct RmsNorm(LayerNorm);
+pub struct RmsNorm<T> {
+    inner: LayerNorm,
+    _ghost: PhantomData<T>,
+}
 
-impl RmsNorm {
+impl RmsNorm<RmsNormNonQuantized> {
     pub fn new(weight: Tensor, eps: f64) -> Self {
         Self(LayerNorm::rms_norm(weight, eps))
     }
+}
 
-    pub fn into_inner(self) -> LayerNorm {
-        self.0
+impl RmsNorm<RmsNormQuantized> {
+    pub fn new(weight: Tensor, eps: f64) -> Self {
+        Self(LayerNorm::rms_norm(weight, eps))
     }
 
     #[cfg(feature = "cuda")]
@@ -262,22 +272,37 @@ impl RmsNorm {
     }
 }
 
-impl Module for RmsNorm {
-    fn forward(&self, xs: &Tensor) -> Result<Tensor> {
+impl<T> RmsNorm<T> {
+    pub fn into_inner(self) -> LayerNorm {
+        self.0
+    }
+}
+
+impl Module for RmsNorm<RmsNormNonQuantized> {
+    fn forward(&self, xs: &Tensor, is_quantized: bool) -> Result<Tensor> {
         #[cfg(feature = "cuda")]
-        /*if !is_quantized { // This is a hack. It seems like quantized works without this impl, but it is slower.
+        {
             let (bs, s, h) = xs.dims3()?;
             let xs = xs.reshape((bs * s, h))?;
             let res = candle_layer_norm::rms_norm(&xs, self.0.weight(), None, self.0.eps as f32)?;
             res.reshape((bs, s, h))
-        } else {*/
-            match (xs.dtype(), xs.device()) {
-                (DType::BF16, Device::Cuda(dev))
-                | (DType::F32, Device::Cuda(dev))
-                | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
-                _ => {return self.0.forward(xs)}
-            }//;
-        //}
+        }
+        #[cfg(not(feature = "cuda"))]
+        {
+            self.0.forward(xs)
+        }
+    }
+}
+
+impl Module for RmsNorm<RmsNormQuantized> {
+    fn forward(&self, xs: &Tensor, is_quantized: bool) -> Result<Tensor> {
+        #[cfg(feature = "cuda")]
+        match (xs.dtype(), xs.device()) {
+            (DType::BF16, Device::Cuda(dev))
+            | (DType::F32, Device::Cuda(dev))
+            | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
+            _ => return self.0.forward(xs),
+        }
         #[cfg(not(feature = "cuda"))]
         {
             self.0.forward(xs)
