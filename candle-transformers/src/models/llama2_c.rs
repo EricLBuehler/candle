@@ -317,9 +317,9 @@ impl Block {
     fn load(vb: VarBuilder, cfg: &Config) -> Result<Self> {
         let attn = CausalSelfAttention::load(vb.pp("self_attn"), cfg)?;
         let mlp = Mlp::load(vb.pp("mlp"), cfg)?;
-        let input_layernorm = rms_norm(cfg.dim, cfg.norm_eps, vb.pp("input_layernorm"))?;
+        let input_layernorm = rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("input_layernorm"))?;
         let post_attention_layernorm =
-            rms_norm(cfg.dim, cfg.norm_eps, vb.pp("post_attention_layernorm"))?;
+            rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("post_attention_layernorm"))?;
         Ok(Self::new(
             input_layernorm,
             attn,
@@ -353,7 +353,7 @@ impl Llama {
     pub fn load(vb: VarBuilder, cfg: Config) -> Result<Self> {
         let wte = embedding(cfg.vocab_size, cfg.dim, vb.pp("model.embed_tokens"))?;
         let lm_head = linear(cfg.dim, cfg.vocab_size, vb.pp("lm_head"))?;
-        let ln_f = rms_norm(cfg.dim, cfg.norm_eps, vb.pp("model.norm"))?;
+        let ln_f = rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("model.norm"))?;
         let blocks: Vec<_> = (0..cfg.n_layers)
             .map(|i| Block::load(vb.pp(&format!("model.layers.{i}")), &cfg).unwrap())
             .collect();

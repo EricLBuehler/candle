@@ -846,8 +846,8 @@ pub mod transformer {
         fn new(cfg: &Config, vb: VarBuilder) -> Result<Self> {
             let attention = Attention::new(cfg, vb.pp("attention"))?;
             let feed_forward = FeedForward::new(cfg, vb.pp("feed_forward"))?;
-            let ffn_norm = rms_norm(cfg.dim, cfg.norm_eps, vb.pp("ffn_norm"))?;
-            let attention_norm = rms_norm(cfg.dim, cfg.norm_eps, vb.pp("attention_norm"))?;
+            let ffn_norm = rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("ffn_norm"))?;
+            let attention_norm = rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("attention_norm"))?;
             Ok(Self {
                 attention,
                 feed_forward,
@@ -897,7 +897,7 @@ pub mod transformer {
                 let layer = Block::new(cfg, vb_l.pp(layer_idx))?;
                 layers.push(layer)
             }
-            let norm = rms_norm(cfg.dim, cfg.norm_eps, vb.pp("norm"))?;
+            let norm = rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("norm"))?;
             let output = linear_b(cfg.dim, cfg.vocab_size, false, vb.pp("output"))?;
             let dtype = vb.dtype();
             let spk_cond_mask = Tensor::cat(

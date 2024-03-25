@@ -1,5 +1,5 @@
 use candle::{Module, Result, Tensor};
-use candle_nn::VarBuilder;
+use candle_nn::{layer_norm::RmsNormNonQuantized, VarBuilder};
 
 #[derive(Debug, Clone)]
 pub struct Embedding {
