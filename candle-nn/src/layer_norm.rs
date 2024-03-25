@@ -273,7 +273,7 @@ impl RmsNorm {
                 (DType::BF16, Device::Cuda(dev))
                 | (DType::F32, Device::Cuda(dev))
                 | (DType::F16, Device::Cuda(dev)) => return self.fused_rmsnorm(xs, &dev),
-                _ => {}
+                _ => {return self.0.forward(xs)}
             }//;
         //}
         #[cfg(not(feature = "cuda"))]
