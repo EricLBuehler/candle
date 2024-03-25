@@ -310,7 +310,16 @@ impl Module for RmsNorm<RmsNormQuantized> {
     }
 }
 
-pub fn rms_norm(size: usize, eps: f64, vb: crate::VarBuilder) -> Result<RmsNorm> {
+pub fn rms_norm_non_quant(size: usize, eps: f64, vb: crate::VarBuilder) -> Result<RmsNorm<RmsNormNonQuantized>> {
+    let config = LayerNormConfig {
+        eps,
+        remove_mean: false,
+        affine: false,
+    };
+    Ok(RmsNorm(layer_norm(size, config, vb)?))
+}
+
+pub fn rms_norm_quant(size: usize, eps: f64, vb: crate::VarBuilder) -> Result<RmsNorm<RmsNormQuantized>> {
     let config = LayerNormConfig {
         eps,
         remove_mean: false,
