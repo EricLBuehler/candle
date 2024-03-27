@@ -305,7 +305,7 @@ impl Module for RmsNorm<RmsNormNonQuantized> {
 
 impl Module for RmsNorm<RmsNormQuantized> {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
-        /*#[cfg(feature = "cuda")]
+        #[cfg(feature = "cuda")]
         match (xs.dtype(), xs.device()) {
             (DType::BF16, Device::Cuda(dev))
             | (DType::F32, Device::Cuda(dev))
@@ -313,9 +313,9 @@ impl Module for RmsNorm<RmsNormQuantized> {
             _ => return self.inner.forward(xs),
         }
         #[cfg(not(feature = "cuda"))]
-        {*/
+        {
             self.inner.forward(xs)
-        //}
+        }
     }
 }
 
