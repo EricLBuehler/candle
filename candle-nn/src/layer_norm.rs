@@ -288,7 +288,7 @@ impl<T> RmsNorm<T> {
 
 impl Module for RmsNorm<RmsNormNonQuantized> {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
-        /*#[cfg(feature = "cuda")]
+        #[cfg(feature = "cuda")]
         {
             let (bs, s, h) = xs.dims3()?;
             let xs = xs.reshape((bs * s, h))?;
@@ -297,9 +297,9 @@ impl Module for RmsNorm<RmsNormNonQuantized> {
             res.reshape((bs, s, h))
         }
         #[cfg(not(feature = "cuda"))]
-        {*/
+        {
             self.inner.forward(xs)
-        //}
+        }
     }
 }
 
