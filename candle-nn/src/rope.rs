@@ -202,7 +202,6 @@ impl RotaryEmbedding {
         k: &mut Tensor,
         b_sz: usize,
     ) -> Result<()> {
-        return Ok(());
         match (q.device(), k.device()) {
             #[cfg(feature = "cuda")]
             (Device::Cuda(dev), Device::Cuda(_)) => {
