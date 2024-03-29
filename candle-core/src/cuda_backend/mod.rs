@@ -1153,15 +1153,9 @@ fn gemm_config<T>(
     } else if (rhs_m1 == k || n == 1) && (rhs_m2 == 1 || k == 1) {
         (k as i32, cublasOperation_t::CUBLAS_OP_T)
     } else {
-<<<<<<< HEAD:candle-core/src/cuda_backend/mod.rs
         Err(CudaError::MatMulNonContiguous {
             lhs_stride: lhs_l.clone(),
             rhs_stride: rhs_l.clone(),
-=======
-        Err(CudaError::RMatMulNonContiguous {
-            lhs_stride: lhs_stride.to_vec(),
-            rhs_stride: rhs_stride.to_vec(),
->>>>>>> 4f2dcf8 (Add better error enum):candle-core/src/cuda_backend.rs
             mnk: (m, n, k),
         })?
     };
