@@ -167,22 +167,6 @@ pub(crate) fn from_storage<S: Into<Shape>>(
     Tensor(Arc::new(tensor_))
 }
 
-/// Creates a fresh tensor structure based on a storage and a shape, this uses contiguous strides. This has a BackpropOp:none().
-pub fn from_storage_no_op<S: Into<Shape>>(storage: Storage, shape: S, is_variable: bool) -> Tensor {
-    let dtype = storage.dtype();
-    let device = storage.device();
-    let tensor_ = Tensor_ {
-        id: TensorId::new(),
-        storage: Arc::new(RwLock::new(storage)),
-        layout: Layout::contiguous(shape),
-        op: BackpropOp::none(),
-        is_variable,
-        dtype,
-        device,
-    };
-    Tensor(Arc::new(tensor_))
-}
-
 impl Tensor {
     pub(crate) fn ones_impl<S: Into<Shape>>(
         shape: S,
@@ -1365,7 +1349,7 @@ impl Tensor {
             }
             .bt())?
         }
-        let mut storage = self.device().alloc(self.shape(), self.dtype(), None)?;
+        let mut storage = unsafe { self.device().alloc_uninit(self.shape(), self.dtype())? };
         self.storage()
             .copy_strided_src(&mut storage, 0, self.layout())?;
         let offset = start * src.dims()[1..].iter().product::<usize>();
@@ -2037,7 +2021,7 @@ impl Tensor {
     /// copied.
     pub(crate) fn make_var(&self) -> Result<Tensor> {
         let shape = self.shape().clone();
-        let mut storage = self.device().alloc(&shape, self.dtype(), None)?;
+        let mut storage = unsafe { self.device().alloc_uninit(&shape, self.dtype())? };
         self.storage()
             .copy_strided_src(&mut storage, 0, self.layout())?;
         Ok(from_storage(storage, shape, BackpropOp::none(), true))

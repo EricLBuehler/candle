@@ -2213,7 +2213,7 @@ impl BackendStorage for CpuStorage {
             // Make the kernel contiguous if not already the case.
             let mut kernel_c = unsafe {
                 self.device()
-                    .alloc_impl(kernel_l.shape(), kernel.dtype(), None)?
+                    .alloc_uninit(kernel_l.shape(), kernel.dtype())?
             };
             kernel.copy_strided_src(&mut kernel_c, 0, kernel_l)?;
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
@@ -2222,7 +2222,7 @@ impl BackendStorage for CpuStorage {
             col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
         };
         let res_l = Layout::contiguous((b, l_out, params.c_out)).transpose(1, 2)?;
-        let mut res_t = unsafe { self.device().alloc_impl(res_l.shape(), res.dtype(), None)? };
+        let mut res_t = unsafe { self.device().alloc_uninit(res_l.shape(), res.dtype())? };
         res.copy_strided_src(&mut res_t, 0, &res_l)?;
         Ok(res_t)
     }
@@ -2315,7 +2315,7 @@ impl BackendStorage for CpuStorage {
             // Make the kernel contiguous if not already the case.
             let mut kernel_c = unsafe {
                 self.device()
-                    .alloc_impl(kernel_l.shape(), kernel.dtype(), None)?
+                    .alloc_uninit(kernel_l.shape(), kernel.dtype())?
             };
             kernel.copy_strided_src(&mut kernel_c, 0, kernel_l)?;
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
@@ -2326,7 +2326,7 @@ impl BackendStorage for CpuStorage {
         let res_l = Layout::contiguous((b, h_out, w_out, params.c_out))
             .transpose(1, 2)?
             .transpose(1, 3)?;
-        let mut res_t = unsafe { self.device().alloc_impl(res_l.shape(), res.dtype(), None)? };
+        let mut res_t = unsafe { self.device().alloc_uninit(res_l.shape(), res.dtype())? };
         res.copy_strided_src(&mut res_t, 0, &res_l)?;
         Ok(res_t)
     }
@@ -2449,6 +2449,10 @@ impl BackendDevice for CpuDevice {
         Ok(s.clone())
     }
 
+    fn storage_from_cpu_storage_owned(&self, s: CpuStorage) -> Result<Self::Storage> {
+        Ok(s)
+    }
+
     fn new(_: usize) -> Result<Self> {
         Ok(Self)
     }
@@ -2550,37 +2554,77 @@ impl BackendDevice for CpuDevice {
         }
     }
 
+    #[allow(clippy::uninit_vec)]
+    unsafe fn alloc_uninit(&self, shape: &Shape, dtype: DType) -> Result<CpuStorage> {
+        let elem_count = shape.elem_count();
+        // The code below is highly unsafe but hopefully not directly unsound as we only consider
+        // types that are Copy, not Drop, and for which all bit patterns are proper values.
+        // It's still pretty risky, see the following for more details:
+        // https://github.com/rust-lang/rust-clippy/issues/4483
+        let storage = match dtype {
+            DType::U8 => {
+                let mut v = Vec::with_capacity(elem_count);
+                v.set_len(elem_count);
+                CpuStorage::U8(v)
+            }
+            DType::U32 => {
+                let mut v = Vec::with_capacity(elem_count);
+                v.set_len(elem_count);
+                CpuStorage::U32(v)
+            }
+            DType::I64 => {
+                let mut v = Vec::with_capacity(elem_count);
+                v.set_len(elem_count);
+                CpuStorage::I64(v)
+            }
+            DType::BF16 => {
+                let mut v = Vec::with_capacity(elem_count);
+                v.set_len(elem_count);
+                CpuStorage::BF16(v)
+            }
+            DType::F16 => {
+                let mut v = Vec::with_capacity(elem_count);
+                v.set_len(elem_count);
+                CpuStorage::F16(v)
+            }
+            DType::F32 => {
+                let mut v = Vec::with_capacity(elem_count);
+                v.set_len(elem_count);
+                CpuStorage::F32(v)
+            }
+            DType::F64 => {
+                let mut v = Vec::with_capacity(elem_count);
+                v.set_len(elem_count);
+                CpuStorage::F64(v)
+            }
+        };
+        Ok(storage)
+    }
+
     fn ones_impl(&self, shape: &Shape, dtype: DType) -> Result<CpuStorage> {
-        self.alloc_impl(shape, dtype, Some(1))
+        let elem_count = shape.elem_count();
+        let storage = match dtype {
+            DType::U8 => CpuStorage::U8(vec![1u8; elem_count]),
+            DType::U32 => CpuStorage::U32(vec![1u32; elem_count]),
+            DType::I64 => CpuStorage::I64(vec![1i64; elem_count]),
+            DType::BF16 => CpuStorage::BF16(vec![bf16::ONE; elem_count]),
+            DType::F16 => CpuStorage::F16(vec![f16::ONE; elem_count]),
+            DType::F32 => CpuStorage::F32(vec![1f32; elem_count]),
+            DType::F64 => CpuStorage::F64(vec![1f64; elem_count]),
+        };
+        Ok(storage)
     }
 
     fn zeros_impl(&self, shape: &Shape, dtype: DType) -> Result<CpuStorage> {
-        self.alloc_impl(shape, dtype, Some(0))
-    }
-
-    fn alloc_impl(
-        &self,
-        shape: &Shape,
-        dtype: DType,
-        init_value: Option<u8>,
-    ) -> Result<Self::Storage> {
         let elem_count = shape.elem_count();
         let storage = match dtype {
-            DType::U8 => CpuStorage::U8(vec![init_value.unwrap_or(0); elem_count]),
-            DType::U32 => CpuStorage::U32(vec![init_value.unwrap_or(0) as u32; elem_count]),
-            DType::I64 => CpuStorage::I64(vec![init_value.unwrap_or(0) as i64; elem_count]),
-            DType::BF16 => {
-                CpuStorage::BF16(vec![
-                    bf16::from_f32_const(init_value.unwrap_or(0) as f32);
-                    elem_count
-                ])
-            }
-            DType::F16 => CpuStorage::F16(vec![
-                f16::from_f32_const(init_value.unwrap_or(0) as f32);
-                elem_count
-            ]),
-            DType::F32 => CpuStorage::F32(vec![init_value.unwrap_or(0) as f32; elem_count]),
-            DType::F64 => CpuStorage::F64(vec![init_value.unwrap_or(0) as f64; elem_count]),
+            DType::U8 => CpuStorage::U8(vec![0u8; elem_count]),
+            DType::U32 => CpuStorage::U32(vec![0u32; elem_count]),
+            DType::I64 => CpuStorage::I64(vec![0i64; elem_count]),
+            DType::BF16 => CpuStorage::BF16(vec![bf16::ZERO; elem_count]),
+            DType::F16 => CpuStorage::F16(vec![f16::ZERO; elem_count]),
+            DType::F32 => CpuStorage::F32(vec![0f32; elem_count]),
+            DType::F64 => CpuStorage::F64(vec![0f64; elem_count]),
         };
         Ok(storage)
     }
