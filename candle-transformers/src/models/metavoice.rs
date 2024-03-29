@@ -847,7 +847,8 @@ pub mod transformer {
             let attention = Attention::new(cfg, vb.pp("attention"))?;
             let feed_forward = FeedForward::new(cfg, vb.pp("feed_forward"))?;
             let ffn_norm = rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("ffn_norm"))?;
-            let attention_norm = rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("attention_norm"))?;
+            let attention_norm =
+                rms_norm_non_quant(cfg.dim, cfg.norm_eps, vb.pp("attention_norm"))?;
             Ok(Self {
                 attention,
                 feed_forward,
