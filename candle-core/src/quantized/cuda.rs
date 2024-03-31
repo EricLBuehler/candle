@@ -167,7 +167,6 @@ fn mul_mat_vec_via_q8_1(
     nrows: usize,
     dev: &CudaDevice,
 ) -> Result<CudaStorage> {
-    println!("mmvq8_1");
     use cudarc::driver::LaunchAsync;
 
     let data_elems = data.len() / dtype.type_size() * dtype.block_size();
