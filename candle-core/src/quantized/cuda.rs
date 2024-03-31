@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering;
+
 use super::{GgmlDType, QStorage};
 use crate::quantized::k_quants::GgmlType;
 use crate::{backend::BackendDevice, cuda_backend::WrapErr};
@@ -343,7 +345,7 @@ impl QCudaStorage {
             crate::bail!("mismatch on matmul dim {self_shape:?} {:?}", rhs_l.shape())
         }
 
-        let out = if FORCE_DMMV {
+        let out = if FORCE_DMMV.load(Ordering::Relaxed) {
             dequantize_mul_mat_vec(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
         } else {
             mul_mat_vec_via_q8_1(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
