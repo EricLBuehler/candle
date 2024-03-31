@@ -343,7 +343,11 @@ impl QCudaStorage {
             crate::bail!("mismatch on matmul dim {self_shape:?} {:?}", rhs_l.shape())
         }
 
+<<<<<<< HEAD
         let out = if FORCE_DMMV.load(std::sync::atomic::Ordering::Relaxed) {
+=======
+        let out = if FORCE_DMMV {
+>>>>>>> a74f6008 (Also test dmmv.)
             dequantize_mul_mat_vec(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
         } else {
             mul_mat_vec_via_q8_1(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
@@ -438,6 +442,19 @@ mod test {
         // for n = 255, n.(n+1).(2n+1) / 6 = 5559680
         // Q8 means 1/256 precision.
         assert_eq!(vs[0], 5561664.5);
+
+        let cuda_storage = dequantize_mul_mat_vec(
+            &xs.data,
+            &y.slice(..),
+            /* dtype */ GgmlDType::Q4_0,
+            /* ncols */ ncols,
+            /* nrows */ 1,
+            &dev,
+        )?;
+        let vs = cuda_storage.as_cuda_slice::<f32>()?;
+        let vs = dev.dtoh_sync_copy(&vs.slice(..)).unwrap();
+        assert_eq!(vs.len(), 1);
+        assert_eq!(vs[0], 5561851.0);
         Ok(())
     }
 }
