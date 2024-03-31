@@ -25,6 +25,7 @@ pub const NWARPS_Q4_0_AMPERE: usize = 4;
 pub const GGML_CUDA_MMV_X: usize = 32;
 pub const GGML_CUDA_MMV_Y: usize = 1;
 pub const CUDA_QUANTIZE_BLOCK_SIZE: usize = 256;
+pub const CUDA_QUANTIZE_BLOCK_SIZE: usize = 256;
 pub const CUDA_DEQUANTIZE_BLOCK_SIZE: usize = 256;
 pub const MATRIX_ROW_PADDING: usize = 512;
 
@@ -36,8 +37,16 @@ fn pad(p: usize, q: usize) -> usize {
     ceil_div(p, q) * q
 }
 
-fn quantize_q8_1(
-    src: &CudaView<f32>,
+fn ceil_div(p: usize, q: usize) -> usize {
+    (p + q - 1) / q
+}
+
+fn pad(p: usize, q: usize) -> usize {
+    ceil_div(p, q) * q
+}
+
+pub fn quantize_q8_1(
+    src: &CudaSlice<f32>,
     dst: &mut CudaSlice<u8>,
     elem_count: usize,
     dev: &CudaDevice,
