@@ -1639,34 +1639,31 @@ impl BackendDevice for MetalDevice {
         self.id == rhs.id
     }
 
-    fn zeros_impl(&self, shape: &Shape, dtype: DType) -> Result<MetalStorage> {
-        self.alloc_impl(shape, dtype, Some(0))
+    unsafe fn alloc_uninit(&self, shape: &Shape, dtype: DType) -> Result<MetalStorage> {
+        let buffer = self.new_buffer(shape.elem_count(), dtype, "alloc-uninit")?;
+        Ok(MetalStorage::new(
+            buffer,
+            self.clone(),
+            shape.elem_count(),
+            dtype,
+        ))
     }
 
-    fn alloc_impl(
-        &self,
-        shape: &Shape,
-        dtype: DType,
-        init_value: Option<u8>,
-    ) -> Result<MetalStorage> {
-        if init_value.is_some_and(|x| x == 0) || init_value.is_none() {
-            let size = shape.elem_count() * dtype.size_in_bytes();
-            let buffer = self.allocate_zeros(size)?;
-            Ok(MetalStorage::new(
-                buffer,
-                self.clone(),
-                shape.elem_count(),
-                dtype,
-            ))
-        } else {
-            // TODO Is there a faster way ?
-            let cpu_storage = crate::cpu_backend::CpuDevice.alloc_impl(shape, dtype, init_value)?;
-            self.storage_from_cpu_storage(&cpu_storage)
-        }
+    fn zeros_impl(&self, shape: &Shape, dtype: DType) -> Result<MetalStorage> {
+        let size = shape.elem_count() * dtype.size_in_bytes();
+        let buffer = self.allocate_zeros(size)?;
+        Ok(MetalStorage::new(
+            buffer,
+            self.clone(),
+            shape.elem_count(),
+            dtype,
+        ))
     }
 
     fn ones_impl(&self, shape: &Shape, dtype: DType) -> Result<Self::Storage> {
-        self.alloc_impl(shape, dtype, Some(1))
+        // TODO Is there a faster way ?
+        let cpu_storage = crate::cpu_backend::CpuDevice.ones_impl(shape, dtype)?;
+        self.storage_from_cpu_storage(&cpu_storage)
     }
 
     fn storage_from_cpu_storage(&self, storage: &CpuStorage) -> Result<Self::Storage> {
@@ -1685,6 +1682,10 @@ impl BackendDevice for MetalDevice {
             count,
             storage.dtype(),
         ))
+    }
+
+    fn storage_from_cpu_storage_owned(&self, storage: CpuStorage) -> Result<Self::Storage> {
+        self.storage_from_cpu_storage(&storage)
     }
 
     fn rand_uniform(
