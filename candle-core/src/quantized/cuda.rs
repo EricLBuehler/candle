@@ -4,7 +4,6 @@ use crate::{backend::BackendDevice, cuda_backend::WrapErr};
 use crate::{CudaDevice, CudaStorage, Result};
 
 use cudarc::driver::{CudaSlice, CudaView, DeviceSlice};
-use cudarc::driver::{CudaSlice, CudaView, DeviceSlice};
 
 #[derive(Clone, Debug)]
 pub struct QCudaStorage {
@@ -19,7 +18,6 @@ pub fn set_force_dmmv(f: bool) {
     FORCE_DMMV.store(f, std::sync::atomic::Ordering::Relaxed)
 }
 
-pub const FORCE_DMMV: bool = true;
 pub const WARP_SIZE: usize = 32;
 pub const MMQ_X_Q4_0_AMPERE: usize = 4;
 pub const MMQ_Y_Q4_0_AMPERE: usize = 32;
@@ -199,10 +197,9 @@ fn mul_mat_vec_via_q8_1(
     };
     let func = dev.get_or_load_func(kernel_name, candle_kernels::QUANTIZED)?;
     let dst = unsafe { dev.alloc::<f32>(nrows).w()? };
-    let block_num_y = (nrows + GGML_CUDA_MMV_Y - 1) / GGML_CUDA_MMV_Y;
     let cfg = cudarc::driver::LaunchConfig {
-        grid_dim: (block_num_y as u32, 1, 1),
-        block_dim: (WARP_SIZE as u32, GGML_CUDA_MMV_Y as u32, 1),
+        grid_dim: (nrows as u32, 1, 1),
+        block_dim: (WARP_SIZE as u32, 4, 1),
         shared_mem_bytes: 0,
     };
 
@@ -346,8 +343,8 @@ impl QCudaStorage {
             crate::bail!("mismatch on matmul dim {self_shape:?} {:?}", rhs_l.shape())
         }
 
-        let out = if FORCE_DMMV {
-            dequantize_mut_mal_vec(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
+        let out = if FORCE_DMMV.load(std::sync::atomic::Ordering::Relaxed) {
+            dequantize_mul_mat_vec(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
         } else {
             mul_mat_vec_via_q8_1(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
         };
