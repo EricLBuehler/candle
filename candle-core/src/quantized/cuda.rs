@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use super::{GgmlDType, QStorage};
 use crate::quantized::k_quants::GgmlType;
 use crate::{backend::BackendDevice, cuda_backend::WrapErr};
@@ -38,8 +36,8 @@ fn pad(p: usize, q: usize) -> usize {
     ceil_div(p, q) * q
 }
 
-pub fn quantize_q8_1(
-    src: &CudaSlice<f32>,
+fn quantize_q8_1(
+    src: &CudaView<f32>,
     dst: &mut CudaSlice<u8>,
     elem_count: usize,
     dev: &CudaDevice,
@@ -345,7 +343,7 @@ impl QCudaStorage {
             crate::bail!("mismatch on matmul dim {self_shape:?} {:?}", rhs_l.shape())
         }
 
-        let out = if FORCE_DMMV.load(Ordering::Relaxed) {
+        let out = if FORCE_DMMV.load(std::sync::atomic::Ordering::Relaxed) {
             dequantize_mul_mat_vec(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
         } else {
             mul_mat_vec_via_q8_1(&self.data, &rhs, self.dtype, ncols, nrows, self.device())?
