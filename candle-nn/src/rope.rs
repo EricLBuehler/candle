@@ -70,6 +70,52 @@ impl RotaryEmbedding {
         })
     }
 
+    pub fn new_partial(
+        base: f32,
+        head_dim: usize,
+        rot_dim: usize,
+        max_position_embeddings: usize,
+        device: &Device,
+        is_gpt_neox: bool,
+        dtype: DType,
+    ) -> Result<Self> {
+        let theta: Vec<_> = (0..rot_dim)
+            .step_by(2)
+            .map(|i| 1f32 / base.powf(i as f32 / rot_dim as f32))
+            .collect();
+        let theta_len = theta.len();
+        let theta = Tensor::from_vec(theta, (1, theta_len), device)?.to_dtype(DType::F32)?;
+        let idx_theta = Tensor::arange(0, max_position_embeddings as u32, device)?
+            .to_dtype(DType::F32)?
+            .reshape((max_position_embeddings, 1))?
+            .matmul(&theta)?;
+        let cos = idx_theta.cos()?;
+        let sin = idx_theta.sin()?;
+        Ok(Self {
+            head_size: head_dim,
+            cos: if is_gpt_neox {
+                Tensor::cat(
+                    &[cos.clone().to_dtype(dtype)?, cos.clone().to_dtype(dtype)?],
+                    D::Minus1,
+                )?
+            } else {
+                cos.clone().to_dtype(dtype)?
+            },
+            sin: if is_gpt_neox {
+                Tensor::cat(
+                    &[sin.clone().to_dtype(dtype)?, sin.clone().to_dtype(dtype)?],
+                    D::Minus1,
+                )?
+            } else {
+                sin.clone().to_dtype(dtype)?
+            },
+            cache: Tensor::cat(&[cos.clone(), sin.clone()], D::Minus1)?
+                .contiguous()?
+                .to_dtype(dtype)?,
+            is_gpt_neox,
+        })
+    }
+
     #[cfg(feature = "cuda")]
     fn execute_dtype<T: CudaDType + WithDType + DeviceRepr>(
         &self,
