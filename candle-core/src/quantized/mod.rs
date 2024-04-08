@@ -376,8 +376,8 @@ impl QTensor {
 
 #[derive(Clone, Debug)]
 pub enum QMatMul {
-    QTensor(std::sync::Arc<QTensor>),
-    Tensor(Tensor),
+    pub QTensor(std::sync::Arc<QTensor>),
+    pub Tensor(Tensor),
 }
 
 thread_local! {
