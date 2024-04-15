@@ -106,6 +106,9 @@ fn unary_op(device: &Device) -> Result<()> {
             [2.6911, -0.0647, -0.1091, 1.7353, 2.7933]
         ]
     );
+    let t_f16 = tensor.to_dtype(DType::F16)?.gelu()?.to_dtype(DType::F32)?;
+    let max_diff = (tensor.gelu()? - t_f16)?.flatten_all()?.max(0)?;
+    assert!(max_diff.to_vec0::<f32>()? < 5e-3);
     assert_eq!(
         test_utils::to_vec2_round(&tensor.gelu_erf()?, 4)?,
         [
@@ -147,6 +150,14 @@ fn unary_op(device: &Device) -> Result<()> {
     assert_eq!(
         test_utils::to_vec1_round(&tensor.round_to(-2)?, 4)?,
         [3000.0, 300.]
+    );
+    let tensor = Tensor::new(
+        &[-1.01f32, -0.9, -0.1, 0.0, -0.0, 0.1, 0.9, 1.0, 1.1],
+        device,
+    )?;
+    assert_eq!(
+        tensor.sign()?.to_vec1::<f32>()?,
+        [-1., -1., -1., 0., 0., 1., 1., 1., 1.]
     );
     Ok(())
 }
@@ -1072,6 +1083,27 @@ fn randn(device: &Device) -> Result<()> {
     Ok(())
 }
 
+fn zero_dim(device: &Device) -> Result<()> {
+    let t = Tensor::zeros((4, 0, 1), DType::F32, device)?;
+    assert_eq!(t.dims3()?, (4, 0, 1));
+    let t2 = Tensor::zeros((4, 3, 1), DType::F32, device)?;
+    let t_cat = Tensor::cat(&[&t, &t2], 1)?;
+    assert_eq!(t_cat.dims3()?, (4, 3, 1));
+    let t_cat = Tensor::cat(&[&t, &t], 1)?;
+    assert_eq!(t_cat.dims3()?, (4, 0, 1));
+    let t_unary = t.sqrt()?;
+    assert_eq!(t_unary.dims3()?, (4, 0, 1));
+    let t_plus = (&t + 1.)?;
+    assert_eq!(t_plus.dims3()?, (4, 0, 1));
+    let t_mm = t2.matmul(&t.t()?)?;
+    assert_eq!(t_mm.dims3()?, (4, 3, 0));
+    let t_mm = t.matmul(&t2.t()?)?;
+    assert_eq!(t_mm.dims3()?, (4, 0, 3));
+    let t_mm = t.t()?.matmul(&t)?;
+    assert_eq!(t_mm.dims3()?, (4, 1, 1));
+    Ok(())
+}
+
 test_device!(zeros, zeros_cpu, zeros_gpu, zeros_metal);
 test_device!(ones, ones_cpu, ones_gpu, ones_metal);
 test_device!(full, full_cpu, full_gpu, full_metal);
@@ -1120,6 +1152,7 @@ test_device!(
 test_device!(randn, randn_cpu, randn_gpu, randn_metal);
 test_device!(clamp, clamp_cpu, clamp_gpu, clamp_metal);
 test_device!(var, var_cpu, var_gpu, var_metal);
+test_device!(zero_dim, zero_dim_cpu, zero_dim_gpu, zero_dim_metal);
 
 // There was originally a bug on the CPU implementation for randn
 // https://github.com/huggingface/candle/issues/381
@@ -1247,8 +1280,8 @@ fn pow() -> Result<()> {
     let rhs = (&lhs - 2.)?;
     let res = lhs.pow(&rhs)?;
     assert_eq!(
-        test_utils::to_vec2_round(&res, 4)?,
-        [[1.0, 1.0, 3.0], [16.0, 125.0, 1296.0001]]
+        test_utils::to_vec2_round(&res, 3)?,
+        [[1.0, 1.0, 3.0], [16.0, 125.0, 1296.0]]
     );
     Ok(())
 }

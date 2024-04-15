@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use candle::{DType, Device, Module, Result, Tensor, D};
-use candle_nn::{linear_b as linear, Linear, VarBuilder};
+use candle_nn::{linear_b as linear, Activation, Linear, VarBuilder};
 
 fn default_max_position_embeddings() -> usize {
     4096
@@ -11,7 +11,9 @@ fn default_max_position_embeddings() -> usize {
 pub struct Config {
     pub attention_bias: bool,
     pub head_dim: usize,
-    pub hidden_act: candle_nn::Activation,
+    // The code gemma configs include both hidden_act and hidden_activation.
+    pub hidden_act: Option<Activation>,
+    pub hidden_activation: Option<Activation>,
     pub hidden_size: usize,
     pub intermediate_size: usize,
     pub num_attention_heads: usize,
@@ -23,6 +25,16 @@ pub struct Config {
 
     #[serde(default = "default_max_position_embeddings")]
     pub max_position_embeddings: usize,
+}
+
+impl Config {
+    fn hidden_act(&self) -> Result<Activation> {
+        match (self.hidden_act, self.hidden_activation) {
+            (None, Some(act)) | (Some(act), None) => Ok(act),
+            (Some(_), Some(_)) => candle::bail!("both hidden_act and hidden_activation are set"),
+            (None, None) => candle::bail!("none of hidden_act and hidden_activation are set"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -126,7 +138,7 @@ impl MLP {
             gate_proj,
             up_proj,
             down_proj,
-            act_fn: cfg.hidden_act,
+            act_fn: cfg.hidden_act()?,
         })
     }
 }
@@ -179,18 +191,6 @@ impl Attention {
         })
     }
 
-    fn repeat_kv(&self, xs: Tensor) -> Result<Tensor> {
-        let n_rep = self.num_kv_groups;
-        if n_rep == 1 {
-            Ok(xs)
-        } else {
-            let (b_sz, num_kv_heads, seq_len, head_dim) = xs.dims4()?;
-            xs.unsqueeze(2)?
-                .expand((b_sz, num_kv_heads, n_rep, seq_len, head_dim))?
-                .reshape((b_sz, num_kv_heads * n_rep, seq_len, head_dim))
-        }
-    }
-
     fn forward(
         &mut self,
         xs: &Tensor,
@@ -227,8 +227,8 @@ impl Attention {
         };
         self.kv_cache = Some((key_states.clone(), value_states.clone()));
 
-        let key_states = self.repeat_kv(key_states)?.contiguous()?;
-        let value_states = self.repeat_kv(value_states)?.contiguous()?;
+        let key_states = crate::utils::repeat_kv(key_states, self.num_kv_groups)?;
+        let value_states = crate::utils::repeat_kv(value_states, self.num_kv_groups)?;
 
         let attn_output = {
             let scale = 1f64 / f64::sqrt(self.head_dim as f64);

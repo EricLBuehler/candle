@@ -2,7 +2,7 @@ use crate::onnx;
 use crate::onnx::attribute_proto::AttributeType;
 use crate::onnx::tensor_proto::DataType;
 use candle::{bail, DType, Device, Result, Tensor};
-use std::collections::HashMap;
+use std::{collections::HashMap, usize};
 
 pub type Value = Tensor;
 
@@ -508,17 +508,33 @@ pub fn simple_eval(
                 values.insert(node.output[0].clone(), xs);
             }
             "Gather" => {
+                // https://github.com/onnx/onnx/blob/main/docs/Operators.md#Gather
                 let xs = get(&node.input[0])?;
                 let indices = get(&node.input[1])?;
                 let axis = get_attr_opt::<i64>(node, "axis")?.copied().unwrap_or(0);
                 let axis = xs.normalize_axis(axis)?;
-                // TODO: Provide an op to handle the ONNX generalized gather op ideally in a
-                // differentiable way.
-                let xs = if indices.rank() == 0 {
-                    let index = indices.to_vec0::<i64>()? as usize;
-                    xs.narrow(axis, index, 1)?.squeeze(axis)?
-                } else {
-                    todo!("implement gather for {xs:?} {indices:?} axis {axis}")
+
+                // In Pytorch or Numpy this can be done by indexing the xs tensor using the indices
+                // tensor directly, but candle does not support tensor indexing at the moment, so
+                // some workarounds must be done.
+                let xs = match indices.dims() {
+                    [] => {
+                        let index = indices.to_vec0::<i64>()? as usize;
+                        xs.narrow(axis, index, 1)?.squeeze(axis)?
+                    }
+                    [_] => xs.index_select(indices, axis)?,
+                    [first, _] => {
+                        let mut v = Vec::with_capacity(*first);
+                        for i in 0..*first {
+                            v.push(xs.index_select(&indices.get(i)?, axis)?)
+                        }
+                        Tensor::stack(&v, axis)?
+                    }
+                    _ => {
+                        // TODO: Provide an op to handle the ONNX generalized gather op ideally in a
+                        // differentiable way.
+                        todo!("implement gather for {xs:?} {indices:?} axis {axis}")
+                    }
                 };
                 values.insert(node.output[0].clone(), xs);
             }
@@ -780,6 +796,29 @@ pub fn simple_eval(
             "Identity" => {
                 let input = get(&node.input[0])?;
                 values.insert(node.output[0].clone(), input.clone());
+            }
+            // https://onnx.ai/onnx/operators/onnx__ReduceMean.html#reducemean-13
+            // TODO: This version is only compatible with ReduceMean V13 and below.
+            "ReduceMean" => {
+                let input = get(&node.input[0])?;
+                let axes = get_attr_opt::<[i64]>(node, "axes")?;
+                let keepdims = get_attr_opt::<i64>(node, "keepdims")?.copied().unwrap_or(1);
+
+                let n_dims = input.dims().len();
+
+                let axes: Vec<usize> = if let Some(axes) = axes {
+                    axes.iter()
+                        .map(|e| (if e < &0 { (n_dims as i64) + *e } else { *e }) as usize)
+                        .collect()
+                } else {
+                    (0..n_dims).collect()
+                };
+                let output = if keepdims == 1 {
+                    input.mean_keepdim(axes)?
+                } else {
+                    input.mean(axes)?
+                };
+                values.insert(node.output[0].clone(), output);
             }
             op_type => bail!("unsupported op_type {op_type} for op {node:?}"),
         }

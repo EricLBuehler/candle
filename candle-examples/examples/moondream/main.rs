@@ -123,7 +123,7 @@ impl TextGeneration {
             let next_token = self.logits_processor.sample(&logits)?;
             tokens.push(next_token);
             generated_tokens += 1;
-            if next_token == eos_token {
+            if next_token == eos_token || tokens.ends_with(&[27, 10619, 29] /* <END> */) {
                 break;
             }
             let token = self.tokenizer.decode(&[next_token], true).map_err(E::msg)?;
@@ -193,6 +193,10 @@ struct Args {
 
     #[arg(long)]
     quantized: bool,
+
+    /// Use f16 precision for all the computations rather than f32.
+    #[arg(long)]
+    f16: bool,
 
     #[arg(long)]
     model_file: Option<String>,
@@ -283,6 +287,16 @@ async fn main() -> anyhow::Result<()> {
     let start = std::time::Instant::now();
     let device = candle_examples::device(args.cpu)?;
     let config = moondream::Config::v2();
+    let dtype = if args.quantized {
+        if args.f16 {
+            anyhow::bail!("Quantized model does not support f16");
+        }
+        DType::F32
+    } else if device.is_cuda() || args.f16 {
+        DType::F16
+    } else {
+        DType::F32
+    };
     let model = if args.quantized {
         let vb = candle_transformers::quantized_var_builder::VarBuilder::from_gguf(
             &model_file,
@@ -291,15 +305,16 @@ async fn main() -> anyhow::Result<()> {
         let model = quantized_moondream::Model::new(&config, vb)?;
         Model::Quantized(model)
     } else {
-        let vb =
-            unsafe { VarBuilder::from_mmaped_safetensors(&[model_file], DType::F32, &device)? };
+        let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[model_file], dtype, &device)? };
         let model = moondream::Model::new(&config, vb)?;
         Model::Moondream(model)
     };
     println!("loaded the model in {:?}", start.elapsed());
 
     let start = std::time::Instant::now();
-    let image = load_image(args.image)?.to_device(&device)?;
+    let image = load_image(args.image)?
+        .to_device(&device)?
+        .to_dtype(dtype)?;
     let image_embeds = image.unsqueeze(0)?;
     let image_embeds = match model {
         Model::Moondream(ref m) => image_embeds.apply(m.vision_encoder())?,
