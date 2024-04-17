@@ -303,6 +303,9 @@ impl Tensor {
 
     /// Creates a new tensor filled with uninitialized memory of the same shape, dtype, and device as the other
     /// tensor.
+    /// 
+    /// # Safety
+    /// This returns uninitialized memory.
     ///
     /// ```rust
     /// use candle_core::{Tensor, DType, Device};
