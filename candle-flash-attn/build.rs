@@ -78,7 +78,7 @@ fn main() -> Result<()> {
     println!("cargo:rustc-link-lib=flashattention");
     println!("cargo:rustc-link-lib=dylib=cudart");
     // https://github.com/denoland/rusty_v8/blob/20b2989186d1ecdf4c291d0706ff9eb1baaf2cfd/build.rs#L602
-    let target = env::var("TARGET").unwrap();
+    let target = std::env::var("TARGET").unwrap();
     if target.contains("msvc") {
         // nothing to link to
     } else if target.contains("apple")
