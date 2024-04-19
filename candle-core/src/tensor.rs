@@ -303,7 +303,7 @@ impl Tensor {
 
     /// Creates a new tensor filled with uninitialized memory of the same shape, dtype, and device as the other
     /// tensor.
-    /// 
+    ///
     /// # Safety
     /// This returns uninitialized memory.
     ///
