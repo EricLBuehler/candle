@@ -87,7 +87,7 @@ fn main() -> Result<()> {
     {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target.contains("android") {
-     println!("cargo:rustc-link-lib=dylib=c++_shared");
+        println!("cargo:rustc-link-lib=dylib=c++_shared");
     } else {
         println!("cargo:rustc-link-lib=dylib=stdc++");
     }
