@@ -77,7 +77,18 @@ fn main() -> Result<()> {
     println!("cargo:rustc-link-search={}", build_dir.display());
     println!("cargo:rustc-link-lib=flashattention");
     println!("cargo:rustc-link-lib=dylib=cudart");
-    if !target.contains("msvc") {
+    // https://github.com/denoland/rusty_v8/blob/20b2989186d1ecdf4c291d0706ff9eb1baaf2cfd/build.rs#L602
+    let target = env::var("TARGET").unwrap();
+    if target.contains("msvc") {
+        // nothing to link to
+    } else if target.contains("apple")
+        || target.contains("freebsd")
+        || target.contains("openbsd")
+    {
+        println!("cargo:rustc-link-lib=dylib=c++");
+    } else if target.contains("android") {
+     println!("cargo:rustc-link-lib=dylib=c++_shared");
+    } else {
         println!("cargo:rustc-link-lib=dylib=stdc++");
     }
 
