@@ -497,6 +497,9 @@ pub fn replication_pad2d(xs: &Tensor, pad: usize) -> Result<Tensor> {
 
 #[cfg(feature = "cuda")]
 pub fn kvconcat(ltensor: &Tensor, rtensor: &Tensor, concat_dim: usize) -> Result<Tensor> {
+    if !ltensor.is_cuda() {
+        return Tensor::cat(&[ltensor, &rtensor], concat_dim as usize)?.contiguous();
+    }
     use candle::cuda_backend::KVConcat;
     let op = KVConcat { concat_dim };
     //inputs for kvconcat must be contiguous tensors
