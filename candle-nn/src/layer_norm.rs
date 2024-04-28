@@ -284,6 +284,9 @@ impl<T> RmsNorm<T> {
     pub fn into_inner(self) -> LayerNorm {
         self.inner
     }
+    pub fn inner(&self) -> &LayerNorm {
+        &self.inner
+    }
 }
 
 impl Module for RmsNorm<RmsNormNonQuantized> {
