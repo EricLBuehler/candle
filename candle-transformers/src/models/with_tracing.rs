@@ -183,7 +183,7 @@ impl RmsNorm {
 
     pub fn forward_diff(&self, x: &Tensor) -> Result<Tensor> {
         let _enter = self.span.enter();
-        self.inner.forward_diff(x)
+        self.inner.forward(x)
     }
 }
 
