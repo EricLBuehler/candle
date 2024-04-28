@@ -128,7 +128,7 @@ impl LayerNorm {
     }
 }
 
-impl crate::Module for LayerNorm {
+impl Module for LayerNorm {
     fn forward(&self, x: &Tensor) -> Result<Tensor> {
         let x_dtype = x.dtype();
         let internal_dtype = match x_dtype {
@@ -283,9 +283,6 @@ impl RmsNorm<RmsNormQuantized> {
 impl<T> RmsNorm<T> {
     pub fn into_inner(self) -> LayerNorm {
         self.inner
-    }
-    pub fn inner(&self) -> &LayerNorm {
-        &self.inner
     }
 }
 
