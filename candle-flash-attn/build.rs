@@ -71,6 +71,16 @@ fn main() -> Result<()> {
         .arg("--use_fast_math")
         .arg("--verbose");
 
+    // https://github.com/EricLBuehler/mistral.rs/issues/286
+    // https://github.com/huggingface/candle-flash-attn-v1/pull/2
+    let cuda_nvcc_flags_env = std::env::var("CUDA_NVCC_FLAGS");
+    if let Ok(cuda_nvcc_flags_env) = &cuda_nvcc_flags_env {
+        builder.arg("--compiler-options");
+        for arg in cuda_nvcc_flags_env.split(" ").map(|s| s.trim()) {
+            builder.arg(format!(" {arg}"));
+        }
+    }
+
     let out_file = build_dir.join("libflashattention.a");
     builder.build_lib(out_file);
 
