@@ -4,6 +4,8 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+const CUDA_NVCC_FLAGS: Option<&'static str> = option_env!("CUDA_NVCC_FLAGS");
+
 const KERNEL_FILES: [&str; 17] = [
     "kernels/flash_api.cu",
     "kernels/flash_fwd_hdim128_fp16_sm80.cu",
@@ -73,8 +75,7 @@ fn main() -> Result<()> {
 
     // https://github.com/EricLBuehler/mistral.rs/issues/286
     // https://github.com/huggingface/candle-flash-attn-v1/pull/2
-    let cuda_nvcc_flags_env = std::env::var("CUDA_NVCC_FLAGS");
-    if let Ok(cuda_nvcc_flags_env) = &cuda_nvcc_flags_env {
+    if let Some(cuda_nvcc_flags_env) = CUDA_NVCC_FLAGS {
         builder = builder.arg("--compiler-options");
         builder = builder.arg(cuda_nvcc_flags_env);
     }
