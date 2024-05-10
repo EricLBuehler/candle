@@ -76,9 +76,7 @@ fn main() -> Result<()> {
     let cuda_nvcc_flags_env = std::env::var("CUDA_NVCC_FLAGS");
     if let Ok(cuda_nvcc_flags_env) = &cuda_nvcc_flags_env {
         builder = builder.arg("--compiler-options");
-        for arg in cuda_nvcc_flags_env.split(" ").map(|s| s.trim()) {
-            builder = builder.arg(&format!(" {arg}"));
-        }
+        builder = builder.arg(cuda_nvcc_flags_env);
     }
 
     let out_file = build_dir.join("libflashattention.a");
