@@ -77,7 +77,7 @@ fn main() -> Result<()> {
     if let Ok(cuda_nvcc_flags_env) = &cuda_nvcc_flags_env {
         builder.arg("--compiler-options");
         for arg in cuda_nvcc_flags_env.split(" ").map(|s| s.trim()) {
-            builder.arg(format!(" {arg}"));
+            builder.arg(&format!(" {arg}"));
         }
     }
 
