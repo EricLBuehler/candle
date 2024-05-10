@@ -56,7 +56,7 @@ fn main() -> Result<()> {
     };
 
     let kernels = KERNEL_FILES.iter().collect();
-    let builder = bindgen_cuda::Builder::default()
+    let mut builder = bindgen_cuda::Builder::default()
         .kernel_paths(kernels)
         .out_dir(build_dir.clone())
         .arg("-std=c++17")
@@ -75,9 +75,9 @@ fn main() -> Result<()> {
     // https://github.com/huggingface/candle-flash-attn-v1/pull/2
     let cuda_nvcc_flags_env = std::env::var("CUDA_NVCC_FLAGS");
     if let Ok(cuda_nvcc_flags_env) = &cuda_nvcc_flags_env {
-        builder.arg("--compiler-options");
+        builder = builder.arg("--compiler-options");
         for arg in cuda_nvcc_flags_env.split(" ").map(|s| s.trim()) {
-            builder.arg(&format!(" {arg}"));
+            builder = builder.arg(&format!(" {arg}"));
         }
     }
 
