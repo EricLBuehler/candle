@@ -250,44 +250,6 @@ impl Map1 for Powf {
     }
 }
 
-struct Sum<'a>(&'a [usize]);
-impl<'a> Map1 for Sum<'a> {
-    fn f<T: DeviceRepr + WithDType + ValidAsZeroBits>(
-        &self,
-        src: &CudaSlice<T>,
-        dev: &CudaDevice,
-        layout: &Layout,
-    ) -> Result<CudaSlice<T>> {
-        let shape = layout.shape();
-        let src_dims = shape.dims();
-        let el = shape.elem_count();
-        let mut dst_el = el;
-        for &sum_dim in self.0.iter() {
-            dst_el /= src_dims[sum_dim];
-        }
-        let mut sum_dims = self.0.to_vec();
-        // Sort the sum_dims as they have to be processed from left to right when converting the
-        // indexes.
-        sum_dims.sort();
-        let sum_dims_l: Vec<usize> = sum_dims.iter().map(|&d| src_dims[d]).collect();
-        let sum_dims_s: Vec<usize> = sum_dims
-            .iter()
-            .map(|&d| src_dims[d + 1..].iter().product::<usize>())
-            .collect();
-        let cfg = LaunchConfig::for_num_elems(el as u32);
-        let ds = dev
-            .htod_copy([src_dims, layout.stride(), &sum_dims_l, &sum_dims_s].concat())
-            .w()?;
-        let src = &src.slice(layout.start_offset()..);
-        let func = dev.get_or_load_func(&kernel_name::<T>("sum"), kernels::REDUCE)?;
-        let out = dev.alloc_zeros::<T>(dst_el).w()?;
-        let params = (el, src_dims.len(), sum_dims.len(), &ds, src, &out);
-        // SAFETY: ffi.
-        unsafe { func.launch(cfg, params) }.w()?;
-        Ok(out)
-    }
-}
-
 struct FastReduce<'a>(&'a [usize], ReduceOp);
 impl<'a> Map1Any for FastReduce<'a> {
     fn f<T: DeviceRepr + WithDType + ValidAsZeroBits, W: Fn(CudaSlice<T>) -> S>(
@@ -1653,12 +1615,8 @@ impl BackendStorage for CudaStorage {
                 let rhs = &rhs.slice(rhs_l.start_offset()..);
                 let cfg = gemm_config(1., 0., (b, m, n, k), lhs_l, rhs_l)?;
                 let mut out = unsafe { dev.alloc::<f32>(elem_count) }.w()?;
-                unsafe {
-                    self.device
-                        .blas
-                        .gemm_strided_batched(cfg, rhs, lhs, &mut out)
-                }
-                .w()?;
+                unsafe { gemm_strided_batched_f32(&self.device.blas, cfg, rhs, lhs, &mut out) }
+                    .w()?;
                 CudaStorageSlice::F32(out)
             }
             (CudaStorageSlice::F64(lhs), CudaStorageSlice::F64(rhs)) => {
@@ -1855,6 +1813,20 @@ static MM_F16_REDUCED_PRECISION: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 static MM_BF16_REDUCED_PRECISION: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
+static MM_F32_REDUCED_PRECISION: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// This bool controls whether reduced precision reductions (e.g., with tf32 accumulation type) are
+/// allowed with f32 GEMMs.
+pub fn gemm_reduced_precision_f32() -> bool {
+    MM_F32_REDUCED_PRECISION.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// This bool controls whether reduced precision reductions (e.g., with tf32 accumulation type) are
+/// allowed with f32 GEMMs.
+pub fn set_gemm_reduced_precision_f32(b: bool) {
+    MM_F32_REDUCED_PRECISION.store(b, std::sync::atomic::Ordering::Relaxed)
+}
 
 /// This bool controls whether reduced precision reductions (e.g., with fp16 accumulation type) are
 /// allowed with f16 GEMMs.
@@ -1878,6 +1850,51 @@ pub fn gemm_reduced_precision_bf16() -> bool {
 /// allowed with bf16 GEMMs.
 pub fn set_gemm_reduced_precision_bf16(b: bool) {
     MM_BF16_REDUCED_PRECISION.store(b, std::sync::atomic::Ordering::Relaxed)
+}
+
+unsafe fn gemm_strided_batched_f32(
+    cublas: &cudarc::cublas::CudaBlas,
+    cfg: StridedBatchedConfig<f32>,
+    a: &cudarc::driver::CudaView<f32>,
+    b: &cudarc::driver::CudaView<f32>,
+    c: &mut CudaSlice<f32>,
+) -> std::result::Result<(), cudarc::cublas::result::CublasError> {
+    use cudarc::cublas::sys;
+    use cudarc::driver::DevicePtrMut;
+
+    let compute_type = if gemm_reduced_precision_f32() {
+        sys::cublasComputeType_t::CUBLAS_COMPUTE_32F_FAST_TF32
+    } else {
+        sys::cublasComputeType_t::CUBLAS_COMPUTE_32F
+    };
+    let alpha = &cfg.gemm.alpha as *const f32 as *const _;
+    let beta = &cfg.gemm.beta as *const f32 as *const _;
+
+    cudarc::cublas::result::gemm_strided_batched_ex(
+        *cublas.handle(),
+        cfg.gemm.transa,
+        cfg.gemm.transb,
+        cfg.gemm.m,
+        cfg.gemm.n,
+        cfg.gemm.k,
+        alpha,
+        *a.device_ptr() as *const _,
+        sys::cudaDataType_t::CUDA_R_32F,
+        cfg.gemm.lda,
+        cfg.stride_a,
+        *b.device_ptr() as *const _,
+        sys::cudaDataType_t::CUDA_R_32F,
+        cfg.gemm.ldb,
+        cfg.stride_b,
+        beta,
+        *c.device_ptr_mut() as *mut _,
+        sys::cudaDataType_t::CUDA_R_32F,
+        cfg.gemm.ldc,
+        cfg.stride_c,
+        cfg.batch_size,
+        compute_type,
+        sys::cublasGemmAlgo_t::CUBLAS_GEMM_DEFAULT_TENSOR_OP,
+    )
 }
 
 unsafe fn gemm_strided_batched_f16(

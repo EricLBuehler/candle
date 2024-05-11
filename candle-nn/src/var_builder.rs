@@ -276,7 +276,7 @@ impl SimpleBackend for VarMap {
     }
 }
 
-struct SafeTensorWithRouting<'a> {
+pub struct SafeTensorWithRouting<'a> {
     routing: HashMap<String, usize>,
     safetensors: Vec<SafeTensors<'a>>,
 }
