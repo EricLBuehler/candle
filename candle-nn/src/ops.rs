@@ -703,5 +703,5 @@ pub fn kvconcat(ltensor: &Tensor, rtensor: &Tensor, concat_dim: usize) -> Result
 
 #[cfg(not(feature = "cuda"))]
 pub fn kvconcat(ltensor: &Tensor, rtensor: &Tensor, concat_dim: i32) -> Result<Tensor> {
-    Tensor::cat(&[ltensor, &rtensor], concat_dim as usize)?.contiguous()
+    Tensor::cat(&[ltensor, rtensor], concat_dim as usize)?.contiguous()
 }
