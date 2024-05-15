@@ -293,7 +293,7 @@ impl Tensor {
     ///
     /// ```rust
     /// use candle_core::{Tensor, DType, Device};
-    /// let a = Tensor::empty((2, 3), DType::F32, &Device::Cpu)?;
+    /// let a = unsafe { Tensor::empty((2, 3), DType::F32, &Device::Cpu)? };
     /// // a == b
     /// # Ok::<(), candle_core::Error>(())
     /// ```
@@ -311,6 +311,7 @@ impl Tensor {
     /// use candle_core::{Tensor, DType, Device};
     /// let a = Tensor::zeros((2, 3), DType::F32, &Device::Cpu)?;
     /// let b = a.empty_like()?;
+    /// # Ok::<(), candle_core::Error>(())
     /// ```
     pub unsafe fn empty_like(&self) -> Result<Self> {
         Tensor::empty(self.shape(), self.dtype(), self.device())
