@@ -1348,7 +1348,7 @@ fn pow() -> Result<()> {
 
 #[test]
 fn unfold() -> Result<()> {
-    let x = Tensor::arange(0i64, 3 * 2, &Device::Cpu)?.reshape((3,2))?;
+    let x = Tensor::arange(0i64, 3 * 2, &Device::Cpu)?.reshape((3, 2))?;
     let unfolded = x.unfold(0, 2, 1)?;
     dbg!(&unfolded);
     assert_eq!(
