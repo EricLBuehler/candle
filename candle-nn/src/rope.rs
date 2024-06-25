@@ -262,6 +262,18 @@ impl RotaryEmbedding {
         Ok(())
     }
 
+    pub fn forward_slow(
+        &self,
+        positions: &[usize],
+        q: &mut Tensor,
+        k: &mut Tensor,
+        b_sz: usize,
+    ) -> Result<()> {
+        *q = self.apply_rotary_emb(&*q, positions, b_sz)?;
+        *k = self.apply_rotary_emb(&*k, positions, b_sz)?;
+        Ok(())
+    }
+
     fn apply_rotary_emb(
         &self,
         x: &Tensor,
