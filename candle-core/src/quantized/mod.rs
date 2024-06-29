@@ -106,6 +106,18 @@ impl QStorage {
         Ok(())
     }
 
+    fn quantize_onto(&mut self, src: &Storage) -> Result<()> {
+        match (self, src) {
+            (QStorage::Cpu(storage), Storage::Cpu(src)) => {
+                storage.from_float(src.as_slice::<f32>()?)?;
+            }
+            (QStorage::Metal(storage), Storage::Cpu(src)) => storage.quantize_onto(src)?,
+            (QStorage::Cuda(storage), Storage::Cpu(src)) => storage.quantize_onto(src)?,
+            _ => crate::bail!("Invalid dequantize storage locations do not match"),
+        }
+        Ok(())
+    }
+
     fn dequantize(&self, elem_count: usize) -> Result<Storage> {
         match self {
             QStorage::Cpu(storage) => Ok(Storage::Cpu(storage.dequantize(elem_count)?)),
@@ -335,6 +347,28 @@ impl QTensor {
         }
         let mut storage = src.device().qzeros(elem_count, dtype)?;
         storage.quantize(&src.storage())?;
+        Ok(Self {
+            storage,
+            shape: shape.clone(),
+        })
+    }
+
+    /// Quantize `src` (currently on the CPU) to a QTensor on `dev`
+    pub fn quantize_onto(src: Tensor, dtype: GgmlDType, dev: &Device) -> Result<Self> {
+        let shape = src.shape();
+        let block_size = dtype.block_size();
+        check_shape(shape, block_size)?;
+        let src = src.to_dtype(crate::DType::F32)?.flatten_all()?;
+        let elem_count = shape.elem_count();
+        if elem_count % block_size != 0 {
+            crate::bail!(
+                "tensor size ({shape:?}) is not divisible by block size {}",
+                block_size
+            )
+        }
+        // storage is on the `dev`, src is on `cpu`
+        let mut storage = dev.qzeros(elem_count, dtype)?;
+        storage.quantize_onto(&src.storage())?;
         Ok(Self {
             storage,
             shape: shape.clone(),
