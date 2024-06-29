@@ -354,7 +354,7 @@ impl QTensor {
     }
 
     /// Quantize `src` (currently on the CPU) to a QTensor on `dev`
-    pub fn quantize_onto(src: Tensor, dtype: GgmlDType, dev: &Device) -> Result<Self> {
+    pub fn quantize_onto(src: &Tensor, dtype: GgmlDType, dev: &Device) -> Result<Self> {
         let shape = src.shape();
         let block_size = dtype.block_size();
         check_shape(shape, block_size)?;
