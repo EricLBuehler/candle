@@ -101,7 +101,7 @@ impl QStorage {
             }
             (QStorage::Metal(storage), Storage::Metal(src)) => storage.quantize(src)?,
             (QStorage::Cuda(storage), Storage::Cuda(src)) => storage.quantize(src)?,
-            _ => crate::bail!("Invalid dequantize storage locations do not match"),
+            _ => crate::bail!("Invalid quantize storage locations do not match"),
         }
         Ok(())
     }
@@ -113,7 +113,7 @@ impl QStorage {
             }
             (QStorage::Metal(storage), Storage::Cpu(src)) => storage.quantize_onto(src)?,
             (QStorage::Cuda(storage), Storage::Cpu(src)) => storage.quantize_onto(src)?,
-            _ => crate::bail!("Invalid dequantize storage locations do not match"),
+            _ => crate::bail!("Invalid quantize source storage locations: not on cpu"),
         }
         Ok(())
     }
@@ -355,6 +355,12 @@ impl QTensor {
 
     /// Quantize `src` (currently on the CPU) to a QTensor on `dev`
     pub fn quantize_onto(src: &Tensor, dtype: GgmlDType, dev: &Device) -> Result<Self> {
+        if !src.device().is_cpu() {
+            crate::bail!(
+                "`quantize_onto` expects a `src` to be on the cpu, got {:?}.",
+                src.device()
+            )
+        }
         let shape = src.shape();
         let block_size = dtype.block_size();
         check_shape(shape, block_size)?;
