@@ -120,59 +120,59 @@ impl QMetalStorage {
         match self.dtype {
             GgmlDType::F32 => {
                 let vec: Vec<f32> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::F16 => {
                 let vec: Vec<half::f16> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q4_0 => {
                 let vec: Vec<crate::quantized::BlockQ4_0> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q4_1 => {
                 let vec: Vec<crate::quantized::BlockQ4_1> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q5_0 => {
                 let vec: Vec<crate::quantized::BlockQ5_0> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q5_1 => {
                 let vec: Vec<crate::quantized::BlockQ5_1> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q8_0 => {
                 let vec: Vec<crate::quantized::BlockQ8_0> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q8_1 => {
                 let vec: Vec<crate::quantized::BlockQ8_1> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q2K => {
                 let vec: Vec<crate::quantized::BlockQ2K> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q3K => {
                 let vec: Vec<crate::quantized::BlockQ3K> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q4K => {
                 let vec: Vec<crate::quantized::BlockQ4K> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q5K => {
                 let vec: Vec<crate::quantized::BlockQ5K> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q6K => {
                 let vec: Vec<crate::quantized::BlockQ6K> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
             GgmlDType::Q8K => {
                 let vec: Vec<crate::quantized::BlockQ8K> = read_to_vec(&buffer, block_len);
-                vec
+                Ok(vec)
             }
         }
     }
