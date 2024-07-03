@@ -137,17 +137,14 @@ impl QStorage {
             }
             QStorage::Cuda(storage) => {
                 let storage = storage.data()?;
-                let data_ptr = storage.as_ptr();
-                let size_in_bytes = storage.len();
-                let data = unsafe { std::slice::from_raw_parts(data_ptr, size_in_bytes) };
-                Ok(Cow::from(data))
+                Ok(Cow::Owned(storage))
             }
             QStorage::Metal(storage) => {
                 let storage = storage.data()?;
                 let data_ptr = storage.as_ptr() as *const u8;
                 let size_in_bytes = storage.storage_size_in_bytes();
-                let data = unsafe { std::slice::from_raw_parts(data_ptr, size_in_bytes) };
-                Ok(Cow::from(data))
+                let data = unsafe { std::slice::from_raw_parts(data_ptr, size_in_bytes) }.to_vec();
+                Ok(Cow::Owned(data))
             }
         }
     }
