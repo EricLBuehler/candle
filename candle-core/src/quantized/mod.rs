@@ -126,6 +126,7 @@ impl QStorage {
         }
     }
 
+    /// If self is on CUDA or Metal, then a dtoh copy is triggered
     fn data(&self) -> Result<Cow<[u8]>> {
         match self {
             QStorage::Cpu(storage) => {
@@ -134,8 +135,19 @@ impl QStorage {
                 let data = unsafe { std::slice::from_raw_parts(data_ptr, size_in_bytes) };
                 Ok(Cow::from(data))
             }
-            QStorage::Metal(_) | QStorage::Cuda(_) => {
-                crate::bail!("not implemented");
+            QStorage::Cuda(storage) => {
+                let storage = storage.data()?;
+                let data_ptr = storage.as_ptr();
+                let size_in_bytes = storage.len();
+                let data = unsafe { std::slice::from_raw_parts(data_ptr, size_in_bytes) };
+                Ok(Cow::from(data))
+            }
+            QStorage::Metal(storage) => {
+                let storage = storage.data()?;
+                let data_ptr = storage.as_ptr() as *const u8;
+                let size_in_bytes = storage.storage_size_in_bytes();
+                let data = unsafe { std::slice::from_raw_parts(data_ptr, size_in_bytes) };
+                Ok(Cow::from(data))
             }
         }
     }

@@ -431,6 +431,10 @@ impl QCudaStorage {
         dequantize_f16(&self.data, self.dtype, elem_count, self.device())
     }
 
+    pub fn data(&self) -> Result<Vec<u8>> {
+        self.device.dtoh_sync_copy(&self.data).w()
+    }
+
     pub fn quantize(&mut self, src: &CudaStorage) -> Result<()> {
         // Run the quantization on cpu.
         let src = match &src.slice {

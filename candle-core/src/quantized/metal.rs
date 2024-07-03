@@ -1,5 +1,6 @@
 use super::{GgmlDType, QStorage};
 use crate::backend::BackendStorage;
+use crate::quantized::k_quants::GgmlType;
 use crate::{DType, MetalDevice, MetalStorage, Result, Shape};
 use metal::Buffer;
 use std::sync::Arc;
@@ -8,6 +9,7 @@ pub struct QMetalStorage {
     dtype: GgmlDType,
     device: MetalDevice,
     buffer: Arc<Buffer>,
+    elem_count: usize,
 }
 
 impl QMetalStorage {
@@ -18,6 +20,7 @@ impl QMetalStorage {
             buffer,
             device: device.clone(),
             dtype,
+            elem_count,
         })
     }
 
@@ -34,8 +37,6 @@ impl QMetalStorage {
     }
 
     pub fn dequantize(&self, elem_count: usize) -> Result<MetalStorage> {
-        use crate::quantized::k_quants::GgmlType;
-
         let buffer = self.device.new_buffer_managed(self.buffer.length())?;
         let command_buffer = self.device.command_buffer()?;
         command_buffer.set_label("to_cpu");
@@ -112,6 +113,68 @@ impl QMetalStorage {
             elem_count,
             DType::F32,
         ))
+    }
+
+    pub fn data(&self) -> Result<Vec<impl GgmlType>> {
+        let block_len = self.elem_count / self.dtype.block_size();
+        match self.dtype {
+            GgmlDType::F32 => {
+                let vec: Vec<f32> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::F16 => {
+                let vec: Vec<half::f16> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q4_0 => {
+                let vec: Vec<crate::quantized::BlockQ4_0> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q4_1 => {
+                let vec: Vec<crate::quantized::BlockQ4_1> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q5_0 => {
+                let vec: Vec<crate::quantized::BlockQ5_0> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q5_1 => {
+                let vec: Vec<crate::quantized::BlockQ5_1> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q8_0 => {
+                let vec: Vec<crate::quantized::BlockQ8_0> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q8_1 => {
+                let vec: Vec<crate::quantized::BlockQ8_1> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q2K => {
+                let vec: Vec<crate::quantized::BlockQ2K> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q3K => {
+                let vec: Vec<crate::quantized::BlockQ3K> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q4K => {
+                let vec: Vec<crate::quantized::BlockQ4K> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q5K => {
+                let vec: Vec<crate::quantized::BlockQ5K> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q6K => {
+                let vec: Vec<crate::quantized::BlockQ6K> = read_to_vec(&buffer, block_len);
+                vec
+            }
+            GgmlDType::Q8K => {
+                let vec: Vec<crate::quantized::BlockQ8K> = read_to_vec(&buffer, block_len);
+                vec
+            }
+        }
     }
 
     pub fn quantize(&mut self, src: &MetalStorage) -> Result<()> {
@@ -208,12 +271,14 @@ pub fn load_quantized<T: super::GgmlType + Send + Sync + 'static>(
     device: &MetalDevice,
     data: &[T],
 ) -> Result<QStorage> {
+    let elem_count = data.len();
     let buffer = device.new_buffer_with_data(data)?;
     let device = device.clone();
     Ok(QStorage::Metal(QMetalStorage {
         dtype: T::DTYPE,
         device,
         buffer,
+        elem_count,
     }))
 }
 
