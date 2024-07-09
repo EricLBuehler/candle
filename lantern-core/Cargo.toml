@@ -48,3 +48,7 @@ metal = ["dep:metal", "dep:lantern-metal-kernels"]
 [[bench]]
 name = "bench_main"
 harness = false
+
+[[example]]
+name = "metal_basics"
+required-features = ["metal"]

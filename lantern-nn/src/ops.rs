@@ -974,3 +974,24 @@ impl Module for Identity {
         Ok(xs.clone())
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct Identity;
+
+impl Identity {
+    pub fn new() -> Identity {
+        Self
+    }
+}
+
+impl Default for Identity {
+    fn default() -> Self {
+        Self
+    }
+}
+
+impl Module for Identity {
+    fn forward(&self, xs: &Tensor) -> Result<Tensor> {
+        Ok(xs.clone())
+    }
+}
