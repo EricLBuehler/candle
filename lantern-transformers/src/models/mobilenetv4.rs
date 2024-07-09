@@ -5,8 +5,8 @@
 //!
 //! https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/mobilenetv3.py
 
-use candle::{Result, Tensor, D};
-use candle_nn::{
+use lantern::{Result, Tensor, D};
+use lantern_nn::{
     batch_norm, conv2d_no_bias, linear, ops::softmax, Activation, Conv2dConfig, Func, VarBuilder,
 };
 
