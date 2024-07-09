@@ -26,13 +26,13 @@ flamegraph.svg
 *.swo
 trace-*.json
 
-candle-wasm-examples/*/build
-candle-wasm-examples/*/*.bin
-candle-wasm-examples/*/*.jpeg
-candle-wasm-examples/*/audios/*.wav
-candle-wasm-examples/**/*.safetensors
-candle-wasm-examples/**/*.gguf
-candle-wasm-examples/*/package-lock.json
-candle-wasm-examples/**/config*.json
+lantern-wasm-examples/*/build
+lantern-wasm-examples/*/*.bin
+lantern-wasm-examples/*/*.jpeg
+lantern-wasm-examples/*/audios/*.wav
+lantern-wasm-examples/**/*.safetensors
+lantern-wasm-examples/**/*.gguf
+lantern-wasm-examples/*/package-lock.json
+lantern-wasm-examples/**/config*.json
 .DS_Store
 .idea/*

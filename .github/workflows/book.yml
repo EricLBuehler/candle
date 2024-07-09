@@ -4,7 +4,7 @@ on:
 
 jobs:
   test:
-    name: Test candle-book
+    name: Test lantern-book
     runs-on: ubuntu-latest
     permissions:
       contents: write  # To push a branch 
@@ -24,6 +24,6 @@ jobs:
         curl -sSL $url | tar -xz --directory=bin
         echo "$(pwd)/bin" >> $GITHUB_PATH
     - name: Run tests
-      run: cd candle-book && cargo build && mdbook test -L ../target/debug/deps/
+      run: cd lantern-book && cargo build && mdbook test -L ../target/debug/deps/
 
 

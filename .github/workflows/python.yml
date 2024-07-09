@@ -6,10 +6,10 @@ on:
     branches:
       - main
     paths:
-      - candle-pyo3/**
+      - lantern-pyo3/**
   pull_request:
     paths:
-      - candle-pyo3/**
+      - lantern-pyo3/**
 
 jobs:
   build_and_test:
@@ -46,7 +46,7 @@ jobs:
             repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install
-        working-directory: ./candle-pyo3
+        working-directory: ./lantern-pyo3
         run: |
           python -m venv .env
           source .env/bin/activate
@@ -55,14 +55,14 @@ jobs:
           python -m maturin develop -r --features onnx
 
       - name: Check style
-        working-directory: ./candle-pyo3
+        working-directory: ./lantern-pyo3
         run: |
           source .env/bin/activate
           python stub.py --check
           black --check .
 
       - name: Run tests
-        working-directory: ./candle-pyo3
+        working-directory: ./lantern-pyo3
         run: |
           source .env/bin/activate
           python -m pytest -s -v tests

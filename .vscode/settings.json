@@ -4,7 +4,7 @@
     },
     "python.formatting.provider": "none",
     "python.testing.pytestArgs": [
-        "candle-pyo3"
+        "lantern-pyo3"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,

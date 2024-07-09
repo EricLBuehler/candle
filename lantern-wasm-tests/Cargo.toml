@@ -1,0 +1,15 @@
+[package]
+name = "lantern-wasm-tests"
+version.workspace = true
+edition.workspace = true
+description = "WASM tests for lantern"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+lantern = { workspace = true }
+rand = { workspace = true }
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.0"

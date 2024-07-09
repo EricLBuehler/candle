@@ -1,0 +1,22 @@
+[package]
+name = "lantern-onnx"
+version = "0.6.0"
+edition = "2021"
+
+description = "ONNX support for lantern"
+repository = "https://github.com/huggingface/lantern"
+keywords = ["blas", "tensor", "machine-learning"]
+categories = ["science"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+lantern = { path = "../lantern-core", package = "lantern-core", version = "0.6.0" }
+lantern-nn = { path = "../lantern-nn", version = "0.6.0" }
+prost = "0.12.1"
+
+[build-dependencies]
+prost-build = "0.12.1"
+
+[dev-dependencies]
+anyhow = { version = "1", features = ["backtrace"] }
+clap = { version = "4.2.4", features = ["derive"] }

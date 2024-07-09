@@ -1,0 +1,40 @@
+[package]
+name = "lantern-nn"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[dependencies]
+accelerate-src = { workspace = true, optional = true }
+lantern = { workspace = true }
+half = { workspace = true }
+thiserror = { workspace = true }
+intel-mkl-src = { workspace = true, optional = true }
+num-traits = { workspace = true }
+rayon = { workspace = true }
+safetensors = { workspace = true }
+serde = { workspace = true }
+metal = { workspace = true, optional = true }
+lantern-metal-kernels = { workspace = true, optional = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+rand = { workspace = true }
+criterion = { workspace = true }
+
+[features]
+default = []
+accelerate = ["dep:accelerate-src", "lantern/accelerate"]
+cuda = ["lantern/cuda"]
+mkl = ["dep:intel-mkl-src", "lantern/mkl"]
+metal = ["lantern/metal", "dep:lantern-metal-kernels", "dep:metal"]
+
+[[bench]]
+name = "bench_main"
+harness = false
