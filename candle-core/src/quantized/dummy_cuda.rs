@@ -28,6 +28,10 @@ impl QCudaStorage {
         Err(Error::NotCompiledWithCudaSupport)
     }
 
+    pub fn data(&self) -> Result<Vec<u8>> {
+        Err(Error::NotCompiledWithCudaSupport)
+    }
+
     pub fn quantize(&mut self, _src: &CudaStorage) -> Result<()> {
         Err(Error::NotCompiledWithCudaSupport)
     }

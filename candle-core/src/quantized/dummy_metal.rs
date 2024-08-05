@@ -1,5 +1,5 @@
 #![allow(unused)]
-use super::GgmlDType;
+use super::{GgmlDType, GgmlType};
 use crate::{Error, MetalDevice, MetalStorage, Result};
 
 pub struct QMetalStorage {
@@ -22,6 +22,10 @@ impl QMetalStorage {
 
     pub fn dequantize(&self, _elem_count: usize) -> Result<MetalStorage> {
         Err(Error::NotCompiledWithMetalSupport)
+    }
+
+    pub fn data(&self) -> Result<Vec<impl GgmlType>> {
+        Err::<Vec<f32>, _>(Error::NotCompiledWithMetalSupport)
     }
 
     pub fn quantize(&mut self, _src: &MetalStorage) -> Result<()> {
