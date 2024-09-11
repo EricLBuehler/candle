@@ -1944,6 +1944,7 @@ impl BackendDevice for MetalDevice {
             buffers,
             kernels,
             seed,
+            seed_value: Cell::new(299792458),
         })
     }
 
@@ -2105,7 +2106,13 @@ impl BackendDevice for MetalDevice {
         }
         seed_buffer.did_modify_range(metal::NSRange::new(0, 4));
 
+        self.seed_value.set(seed);
+
         Ok(())
+    }
+
+    fn get_current_seed(&self) -> Result<u64> {
+        Ok(self.seed_value.get()) 
     }
 
     fn synchronize(&self) -> Result<()> {
