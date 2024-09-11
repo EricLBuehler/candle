@@ -221,7 +221,7 @@ impl crate::backend::BackendDevice for MetalDevice {
     }
 
     fn get_current_seed(&self) -> Result<u64> {
-        Err(Error::NotCompiledWithMetalSupport)        
+        Err(Error::NotCompiledWithMetalSupport)
     }
 
     fn location(&self) -> crate::DeviceLocation {

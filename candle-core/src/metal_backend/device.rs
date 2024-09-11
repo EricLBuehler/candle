@@ -71,7 +71,7 @@ pub struct MetalDevice {
     /// Seed for random number generation.
     pub(crate) seed: Arc<Mutex<Buffer>>,
     /// Value of the current seed
-    pub(crate) seed_value: Cell<u64>,
+    pub(crate) seed_value: Arc<RwLock<u64>>,
 }
 
 impl std::fmt::Debug for MetalDevice {

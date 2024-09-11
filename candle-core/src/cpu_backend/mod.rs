@@ -3314,7 +3314,7 @@ impl BackendDevice for CpuDevice {
     }
 
     fn get_current_seed(&self) -> Result<u64> {
-        crate::bail!("cannot get the CPU rng seed with get_current_seed")        
+        crate::bail!("cannot get the CPU rng seed with get_current_seed")
     }
 
     fn rand_uniform(&self, shape: &Shape, dtype: DType, min: f64, max: f64) -> Result<CpuStorage> {
