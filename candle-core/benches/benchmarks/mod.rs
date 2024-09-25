@@ -6,7 +6,10 @@ pub(crate) mod random;
 pub(crate) mod unary;
 pub(crate) mod where_cond;
 
-use candle_core::{cuda::WrapErr, Device, Result};
+use candle_core::{Device, Result};
+
+#[cfg(feature = "cuda")]
+use candle_core::cuda::WrapErr;
 
 pub(crate) trait BenchDevice {
     fn sync(&self) -> Result<()>;

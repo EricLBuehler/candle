@@ -318,7 +318,7 @@ impl SimpleBackend for VarMap {
     }
 
     fn get_unchecked(&self, name: &str, dtype: DType, dev: &Device) -> Result<Tensor> {
-        VarMap::get_unchecked(&self, name, dtype, dev)
+        VarMap::get_unchecked(self, name, dtype, dev)
     }
 
     fn contains_tensor(&self, name: &str) -> bool {
