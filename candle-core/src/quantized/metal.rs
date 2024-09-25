@@ -208,7 +208,9 @@ impl QMetalStorage {
     }
 
     pub fn data(&self) -> Result<Vec<u8>> {
-        let size = (self.count * self.dtype.size_in_bytes()) as NSUInteger;
+        use metal::NSUInteger;
+        let count = self.buffer.length() as usize;
+        let size = (count * self.dtype.type_size()) as NSUInteger;
 
         let buffer = self.device.new_buffer_managed(size)?;
         {
@@ -220,7 +222,7 @@ impl QMetalStorage {
             blit.end_encoding();
         }
         self.device.wait_until_completed()?;
-        Ok(read_to_vec::<u8>(&buffer, self.count))
+        Ok(read_to_vec::<u8>(&buffer, count))
     }
 }
 
