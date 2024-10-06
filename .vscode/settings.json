@@ -11,9 +11,4 @@
     "rust-analyzer.cargo.features": [
         "cuda",
     ],
-    "files.associations": {
-        "random": "cpp",
-        "ratio": "cpp",
-        "cmath": "cpp"
-    },
 }
