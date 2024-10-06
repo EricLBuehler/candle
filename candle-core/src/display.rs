@@ -514,7 +514,11 @@ impl std::fmt::Display for Tensor {
                 }
             }
             DType::F8E4M3 => {
-                return write!(f, "F8E4M3 does not support display.");
+                if let Ok(tf) = FloatFormatter::<F8E4M3>::new(&to_display, &po) {
+                    let max_w = tf.max_width(&to_display);
+                    tf.fmt_tensor(self, 1, max_w, summarize, &po, f)?;
+                    writeln!(f)?;
+                }
             }
         };
 
