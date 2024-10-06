@@ -1061,6 +1061,7 @@ cuda_dtype!(f16, F16);
 cuda_dtype!(bf16, BF16);
 cuda_dtype!(f32, F32);
 cuda_dtype!(f64, F64);
+cuda_dtype!(F8E4M3, F8E4M3);
 
 impl CudaStorage {
     pub fn wrap_cuda_slice<T: CudaDType>(slice: CudaSlice<T>, device: CudaDevice) -> CudaStorage {
