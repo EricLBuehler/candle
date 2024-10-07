@@ -143,6 +143,7 @@ extern "C" __global__ void FN_NAME( \
 
 #if __CUDA_ARCH__ >= 800
 CAST_OP(__nv_bfloat16, __nv_bfloat16, cast_bf16_bf16)
+CAST_OP(__nv_fp8_e4m3, __nv_fp8_e4m3, cast_f8_e4m3_f8_e4m3)
 
 CAST_OP(__nv_bfloat16, uint32_t, cast_bf16_u32)
 CAST_OP(__nv_bfloat16, float,    cast_bf16_f32)
@@ -156,6 +157,19 @@ CAST_THROUGH_OP(__nv_bfloat16, __half,   float, cast_bf16_f16)
 CAST_THROUGH_OP(__half,   __nv_bfloat16, float, cast_f16_bf16)
 CAST_THROUGH_OP(int32_t,   __nv_bfloat16, float, cast_i32_bf16)
 CAST_THROUGH_OP(__nv_bfloat16, int32_t, float, cast_bf16_i32)
+
+CAST_OP_FP8(__nv_fp8_e4m3, float,    cast_f8_e4m3_f32)
+CAST_OP_FP8_INTO(float,    __nv_fp8_e4m3, cast_f32_f8_e4m3)
+CAST_OP_FP8(__nv_fp8_e4m3, uint8_t, cast_f8_e4m3_u8)
+CAST_OP_FP8(__nv_fp8_e4m3, __half, cast_f8_e4m3_f16)
+CAST_OP_FP8(__nv_fp8_e4m3, double,  cast_f8_e4m3_f64)
+CAST_OP_FP8_INTO(__half,   __nv_fp8_e4m3, cast_f16_f8_e4m3)
+CAST_OP_FP8_INTO(double,   __nv_fp8_e4m3, cast_f64_f8_e4m3)
+CAST_OP_FP8_INTO(uint8_t,   __nv_fp8_e4m3, cast_u8_f8_e4m3)
+CAST_OP_FP8_INTO(int32_t,   __nv_fp8_e4m3, cast_i32_f8_e4m3)
+CAST_OP_FP8(__nv_fp8_e4m3, int32_t, cast_f8_e4m3_i32)
+CAST_OP_FP8(__nv_fp8_e4m3, __nv_bfloat16, cast_f8_e4m3_bf16)
+CAST_OP_FP8_INTO(__nv_bfloat16, __nv_fp8_e4m3, cast_bf16_f8_e4m3)
 #else
 #include <cuda.h>
 #if CUDA_VERSION >= 11000
@@ -172,20 +186,6 @@ CAST_THROUGH_OP(__nv_bfloat16, int32_t, float, cast_bf16_i32)
 CAST_THROUGH_OP(__nv_bfloat16, __nv_fp8_e4m3, float, cast_bf16_f8_e4m3)
 #endif
 #endif
-
-
-CAST_OP_FP8(__nv_fp8_e4m3, float,    cast_f8_e4m3_f32)
-CAST_OP_FP8_INTO(float,    __nv_fp8_e4m3, cast_f32_f8_e4m3)
-// CAST_THROUGH_OP(__nv_fp8_e4m3, uint8_t, float, cast_f8_e4m3_u8)
-// CAST_THROUGH_OP(__nv_fp8_e4m3, __half,  float, cast_f8_e4m3_f16)
-// CAST_THROUGH_OP(__nv_fp8_e4m3, double,  float, cast_f8_e4m3_f64)
-// CAST_THROUGH_OP(__half,   __nv_fp8_e4m3, float, cast_f16_f8_e4m3)
-// CAST_THROUGH_OP(double,   __nv_fp8_e4m3, float, cast_f64_f8_e4m3)
-// CAST_THROUGH_OP(uint8_t,   __nv_fp8_e4m3, float, cast_u8_f8_e4m3)
-// CAST_THROUGH_OP(int32_t,   __nv_fp8_e4m3, float, cast_i32_f8_e4m3)
-// CAST_THROUGH_OP(__nv_fp8_e4m3, int32_t, float, cast_f8_e4m3_i32)
-// CAST_THROUGH_OP(__nv_fp8_e4m3, __nv_bfloat16, float, cast_f8_e4m3_bf16)
-// CAST_THROUGH_OP(__nv_bfloat16, __nv_fp8_e4m3, float, cast_bf16_f8_e4m3)
 
 #if __CUDA_ARCH__ >= 530
 CAST_OP(__half, __half, cast_f16_f16)
