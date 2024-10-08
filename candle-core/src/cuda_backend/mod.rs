@@ -1933,6 +1933,11 @@ impl BackendStorage for CudaStorage {
                 *d.slice(dst_o..).device_ptr(),
                 "copy2d_f64",
             ),
+            (S::F8E4M3(s), S::F8E4M3(d)) => (
+                *s.slice(src_o..).device_ptr(),
+                *d.slice(dst_o..).device_ptr(),
+                "copy2d_f8_e4m3",
+            ),
             _ => Err(CudaError::InternalError("dtype mismatch in copy2d"))?,
         };
         let func = dev.get_or_load_func(kname, kernels::FILL)?;
@@ -1984,6 +1989,18 @@ impl BackendStorage for CudaStorage {
                     dev.dtod_copy(&src, &mut dst).w()?
                 } else {
                     let func = dev.get_or_load_func("ucopy_f32", kernels::UNARY)?;
+                    // SAFETY: Set later by running the kernel.
+                    let params = (el_count, dims.len(), &ds, &src, &mut dst);
+                    // SAFETY: ffi.
+                    unsafe { func.launch(cfg, params) }.w()?
+                }
+            }
+            (CudaStorageSlice::F8E4M3(src), CudaStorageSlice::F8E4M3(dst)) => {
+                let (src, mut dst) = slice_src_and_dst(src, src_l, dst, dst_offset);
+                if src_l.is_contiguous() {
+                    dev.dtod_copy(&src, &mut dst).w()?
+                } else {
+                    let func = dev.get_or_load_func("ucopy_f8_e4m3", kernels::UNARY)?;
                     // SAFETY: Set later by running the kernel.
                     let params = (el_count, dims.len(), &ds, &src, &mut dst);
                     // SAFETY: ffi.
@@ -2388,6 +2405,22 @@ impl crate::CustomOp2 for KVConcat {
                 );
                 unsafe { func.launch(cfg, params) }.w()?;
                 CudaStorageSlice::F64(out)
+            }
+            (CudaStorageSlice::F8E4M3(left_), CudaStorageSlice::F8E4M3(right_)) => {
+                let out = unsafe { dev.alloc::<F8E4M3>(elem_count).w()? };
+                let func = dev.get_or_load_func("kvconcat_f8_e4m3", kernels::KVCONCAT)?;
+                let params = (
+                    left_,
+                    right_,
+                    &out,
+                    self.concat_dim,
+                    chunk_l,
+                    chunk_r,
+                    lstride,
+                    rstride,
+                );
+                unsafe { func.launch(cfg, params) }.w()?;
+                CudaStorageSlice::F8E4M3(out)
             }
             (CudaStorageSlice::U8(left_), CudaStorageSlice::U8(right_)) => {
                 let out = unsafe { dev.alloc::<u8>(elem_count).w()? };
