@@ -253,8 +253,8 @@ impl BackendDevice for CudaDevice {
                 CudaStorageSlice::F64(data)
             }
             DType::F8E4M3 => {
-                let data = self.alloc_zeros::<f64>(elem_count).w()?;
-                CudaStorageSlice::F64(data)
+                let data = self.alloc_zeros::<F8E4M3>(elem_count).w()?;
+                CudaStorageSlice::F8E4M3(data)
             }
         };
         Ok(CudaStorage {
