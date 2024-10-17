@@ -25,6 +25,7 @@ const REDUCE: &str = include_str!("reduce.metal");
 const SORT: &str = include_str!("sort.metal");
 const TERNARY: &str = include_str!("ternary.metal");
 const UNARY: &str = include_str!("unary.metal");
+const SDPA: &str = include_str!("scaled_dot_product_attention.metal");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Source {
@@ -42,6 +43,7 @@ pub enum Source {
     Sort,
     Ternary,
     Unary,
+    Sdpa,
 }
 
 pub mod copy2d {
@@ -221,6 +223,7 @@ impl Kernels {
             Source::Sort => SORT,
             Source::Ternary => TERNARY,
             Source::Unary => UNARY,
+            Source::Sdpa => SDPA,
             Source::Mfa => panic!("Invalid lib"),
         }
     }
@@ -1638,6 +1641,29 @@ pub fn call_gemm(
     encoder.use_resource(rhs_buffer, metal::MTLResourceUsage::Read);
     encoder.use_resource(output, metal::MTLResourceUsage::Write);
     encoder.dispatch_thread_groups(grid_size, group_size);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn call_sdpa(
+    device: &Device,
+    ep: impl EncoderProvider,
+    kernels: &Kernels,
+    name: &'static str,
+    q_stride: &[usize],
+    q_offset: usize,
+    q_buffer: &Buffer,
+    k_stride: &[usize],
+    k_offset: usize,
+    k_buffer: &Buffer,
+    v_stride: &[usize],
+    v_offset: usize,
+    v_buffer: &Buffer,
+    output: &Buffer,
+    alpha: f32,
+    beta: f32,
+) -> Result<(), MetalKernelError> {
+
     Ok(())
 }
 
