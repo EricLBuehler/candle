@@ -974,3 +974,133 @@ impl Module for Identity {
         Ok(xs.clone())
     }
 }
+
+struct Sdpa {
+    scale: f32,
+}
+
+impl candle::CustomOp3 for Sdpa {
+    fn name(&self) -> &'static str {
+        "sdpa"
+    }
+
+    fn cpu_fwd(
+        &self,
+        _s1: &CpuStorage,
+        _l1: &Layout,
+        _s2: &CpuStorage,
+        _l2: &Layout,
+        _s3: &CpuStorage,
+        _l3: &Layout,
+    ) -> Result<(CpuStorage, Shape)> {
+        candle::bail!("SDPA has no cpu impl")
+    }
+
+    #[cfg(feature = "metal")]
+    fn metal_fwd(
+        &self,
+        q: &candle::MetalStorage,
+        q_l: &Layout,
+        k: &candle::MetalStorage,
+        k_l: &Layout,
+        v: &candle::MetalStorage,
+        v_l: &Layout,
+    ) -> Result<(candle::MetalStorage, Shape)> {
+        use candle::backend::BackendStorage;
+        use candle_metal_kernels::SdpaDType;
+
+        let device = q.device();
+
+        let out_dims = vec![q_l.dims()[0], q_l.dims()[1], q_l.dims()[2], v_l.dims()[3]];
+        let elem_count: usize = out_dims.iter().product();
+
+        let output = device.new_buffer(elem_count, q.dtype(), "sdpa_o")?;
+
+        // q,k must have matching emb dim
+        if q_l.dims()[q_l.dims().len() - 1] != k_l.dims()[k_l.dims().len() - 1] {
+            candle::bail!("`q` and `k` last dims must match");
+        }
+
+        // k,v must have matching n kv heads
+        if v_l.dims()[v_l.dims().len() - 3] != k_l.dims()[k_l.dims().len() - 3] {
+            candle::bail!("`k` and `v` head dims must match");
+        }
+
+        // n_heads % n_kv_heads == 0; n_heads >= 1, n_kv_heads >= 1.
+        if q_l.dims()[q_l.dims().len() - 3] % k_l.dims()[k_l.dims().len() - 3] != 0 {
+            candle::bail!("query `n_heads` must be a multiple of `n_kv_heads`");
+        }
+
+        let k_head = k_l.dims()[k_l.dims().len() - 1];
+        let q_head = q_l.dims()[q_l.dims().len() - 1];
+        let q_seq = q_l.dims()[2];
+
+        let mut implementation_supports_use_case = q_head == k_head;
+        let sdpa_full_supported_head_dim = q_head == 64 || q_head == 128;
+
+        // TODO: tune when add simd...
+        #[allow(clippy::absurd_extreme_comparisons)]
+        const SDPA_FULL_THRESHOLD: usize = 0;
+
+        let supports_sdpa_full =
+            q_seq >= SDPA_FULL_THRESHOLD && sdpa_full_supported_head_dim && q_head == k_head;
+
+        implementation_supports_use_case &= supports_sdpa_full;
+
+        if !implementation_supports_use_case {
+            candle::bail!(
+                "Metal does not support q dims {:?}, k dims {:?}, v dims {:?}. Need head dim 64, 128, and q_head == k_head",
+                q_l.dims(),
+                k_l.dims(),
+                v_l.dims()
+            );
+        }
+
+        for t in [k.dtype(), v.dtype()] {
+            if q.dtype() != t {
+                candle::bail!("all q, k, v dtypes must match.");
+            }
+        }
+
+        let itype = match q.dtype() {
+            DType::BF16 => SdpaDType::BF16,
+            DType::F16 => SdpaDType::F16,
+            DType::F32 => SdpaDType::F32,
+            other => candle::bail!("unsupported sdpa type {other:?}"),
+        };
+
+        let command_buffer = q.device().command_buffer()?;
+        command_buffer.set_label("full_attention");
+        candle_metal_kernels::call_sdpa_full(
+            q.device().device(),
+            &command_buffer,
+            q.device().kernels(),
+            q_l.start_offset(),
+            q_l.dims(),
+            q.buffer(),
+            k_l.start_offset(),
+            k_l.dims(),
+            k.buffer(),
+            v_l.start_offset(),
+            v.buffer(),
+            &output,
+            self.scale,
+            itype,
+        )
+        .map_err(candle::Error::wrap)?;
+
+        let newstorage = candle::MetalStorage::new(output, device.clone(), elem_count, q.dtype());
+        Ok((newstorage, Shape::from_dims(&out_dims)))
+    }
+}
+
+/// Scaled dot product attention with a fused kernel.
+///
+/// - `q`: (bs, qhead, seq, hidden)
+/// - `k`: (bs, kv_head, seq, hidden)
+/// - `k`: (bs, kv_head, seq, v_hidden)
+/// - `o`: (bs, qhead, seq, v_hidden)
+/// - `scale` is applied before softmax.
+pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, scale: f32) -> Result<Tensor> {
+    q.apply_op3_no_bwd(k, v, &Sdpa { scale })
+}
