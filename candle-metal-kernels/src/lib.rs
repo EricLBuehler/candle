@@ -179,13 +179,13 @@ pub enum MetalKernelError {
     SdpaHeadSizeMismatch {
         variation: &'static str,
         got: usize,
-        expected: Vec<usize>
+        expected: Vec<usize>,
     },
     #[error("Sdpa {variation} got dtype {got:?}")]
     SdpaHeadDTypeMismatch {
         variation: &'static str,
         got: SdpaDType,
-    }
+    },
 }
 
 impl<T> From<std::sync::PoisonError<T>> for MetalKernelError {
@@ -1683,7 +1683,7 @@ pub fn call_sdpa_full(
     v_buffer: &Buffer,
     output: &Buffer,
     alpha: f32,
-    itype: SdpaDType
+    itype: SdpaDType,
 ) -> Result<(), MetalKernelError> {
     #[derive(Debug)]
     #[repr(C)]
@@ -1727,8 +1727,19 @@ pub fn call_sdpa_full(
         (128, SdpaDType::F16) => "steel_gemm_attention_bm_16_bn_16_bk_128_itype_half",
         (64, SdpaDType::F32) => "steel_gemm_attention_bm_16_bn_16_bk_64_itype_float",
         (128, SdpaDType::F32) => "steel_gemm_attention_bm_16_bn_16_bk_128_itype_float",
-        (other, SdpaDType::F16 | SdpaDType::F32) => return Err(MetalKernelError::SdpaHeadSizeMismatch { variation: "full", got: *other, expected: vec![64, 128] }),
-        (_, SdpaDType::BF16) => return Err(MetalKernelError::SdpaHeadDTypeMismatch { variation: "full", got: SdpaDType::BF16 })
+        (other, SdpaDType::F16 | SdpaDType::F32) => {
+            return Err(MetalKernelError::SdpaHeadSizeMismatch {
+                variation: "full",
+                got: *other,
+                expected: vec![64, 128],
+            })
+        }
+        (_, SdpaDType::BF16) => {
+            return Err(MetalKernelError::SdpaHeadDTypeMismatch {
+                variation: "full",
+                got: SdpaDType::BF16,
+            })
+        }
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name)?;
@@ -1747,13 +1758,13 @@ pub fn call_sdpa_full(
     let _nq_heads = q_shape[1];
     let _nkv_heads = k_shape[1];
 
-    let m = q_shape[q_shape.len()-2];
+    let m = q_shape[q_shape.len() - 2];
     let n = m;
-    let k = q_shape[q_shape.len()-1];
+    let k = q_shape[q_shape.len() - 1];
     let bs_out = q_shape[0] * q_shape[1];
 
     let batch_shape = [q_shape[0] * q_shape[1]];
-    let dk = q_shape[q_shape.len()-1];
+    let dk = q_shape[q_shape.len() - 1];
     let ldq = dk;
     let ldk = dk;
     let ldv = dk;
@@ -1763,10 +1774,10 @@ pub fn call_sdpa_full(
     let tn = 1;
     let tm = (m + BM - 1) / BM;
 
-    let b_stride_q = dk *qseq;
-    let b_stride_k = dk *qseq;
-    let b_stride_v = dk *qseq;
-    let b_stride_o = dk *qseq;
+    let b_stride_q = dk * qseq;
+    let b_stride_k = dk * qseq;
+    let b_stride_v = dk * qseq;
+    let b_stride_o = dk * qseq;
     let swizzle_log = 0;
     let gemm_n_iterations_aligned = (n + BN - 1) / BN;
     let gemm_k_iterations_aligned = (k + bk - 1) / bk;
@@ -1793,7 +1804,7 @@ pub fn call_sdpa_full(
         gemm_k_iterations_aligned: gemm_k_iterations_aligned as i32,
         gemm_sv_m_block_iterations: gemm_sv_m_block_iterations as i32,
         batch_ndim: batch_ndim as i32,
-        alpha
+        alpha,
     };
     let batch_strides = [b_stride_q, b_stride_k, b_stride_v, b_stride_o];
 
@@ -1813,7 +1824,7 @@ pub fn call_sdpa_full(
         batch_shape.as_ptr() as *const i32 as *const c_void,
     );
     encoder.set_bytes(
-        6,
+        7,
         (std::mem::size_of::<usize>() * batch_strides.len()) as u64,
         batch_strides.as_ptr() as *const c_void,
     );
@@ -1827,6 +1838,106 @@ pub fn call_sdpa_full(
         width: 32,
         height: WM as u64,
         depth: WN as u64,
+    };
+    encoder.use_resource(q_buffer, metal::MTLResourceUsage::Read);
+    encoder.use_resource(k_buffer, metal::MTLResourceUsage::Read);
+    encoder.use_resource(v_buffer, metal::MTLResourceUsage::Read);
+    encoder.use_resource(output, metal::MTLResourceUsage::Write);
+    encoder.dispatch_thread_groups(grid_dims, group_dims);
+    Ok(())
+}
+
+/// SDPA full is supported when:
+/// - q head dim == 64, 96, 128
+/// - no mask
+/// - q,k,v are contiguous
+#[allow(clippy::too_many_arguments)]
+pub fn call_sdpa_vector(
+    device: &Device,
+    ep: impl EncoderProvider,
+    kernels: &Kernels,
+    q_offset: usize,
+    q_shape: &[usize],
+    q_buffer: &Buffer,
+    k_offset: usize,
+    k_shape: &[usize],
+    k_stride: &[usize],
+    k_buffer: &Buffer,
+    v_offset: usize,
+    v_buffer: &Buffer,
+    output: &Buffer,
+    alpha: f32,
+    itype: SdpaDType,
+) -> Result<(), MetalKernelError> {
+    let bk = q_shape.last().unwrap();
+
+    let gqa_factor = (q_shape[1] / k_shape[1]) as i32;
+    let n = k_shape[2] as i32;
+    let b = (q_shape[0] * q_shape[1]) as i32;
+    let stride = k_stride[1];
+
+    let name = match (bk, itype) {
+        (64, SdpaDType::F16) => "sdpa_vector_half_64",
+        (96, SdpaDType::F16) => "sdpa_vector_half_96",
+        (128, SdpaDType::F16) => "sdpa_vector_half_128",
+        (64, SdpaDType::BF16) => "sdpa_vector_bfloat_64",
+        (96, SdpaDType::BF16) => "sdpa_vector_bfloat_96",
+        (128, SdpaDType::BF16) => "sdpa_vector_bfloat_128",
+        (64, SdpaDType::F32) => "sdpa_vector_float_64",
+        (96, SdpaDType::F32) => "sdpa_vector_float_96",
+        (128, SdpaDType::F32) => "sdpa_vector_float_128",
+        (other, _) => {
+            return Err(MetalKernelError::SdpaHeadSizeMismatch {
+                variation: "vector",
+                got: *other,
+                expected: vec![64, 96, 128],
+            })
+        }
+    };
+
+    let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name)?;
+    let encoder = ep.encoder();
+    let encoder: &ComputeCommandEncoderRef = encoder.as_ref();
+    encoder.set_compute_pipeline_state(&pipeline);
+
+    // q = (bs, qhead, seq, hidden)
+    // k/v = (bs, kv_head, kv_seq, hidden)
+
+    encoder.set_buffer(0, Some(&q_buffer), q_offset as NSUInteger);
+    encoder.set_buffer(1, Some(&k_buffer), k_offset as NSUInteger);
+    encoder.set_buffer(2, Some(&v_buffer), v_offset as NSUInteger);
+    encoder.set_buffer(3, Some(&output), 0);
+
+    encoder.set_bytes(
+        4,
+        std::mem::size_of::<i32>() as u64,
+        &gqa_factor as *const i32 as *const c_void,
+    );
+    encoder.set_bytes(
+        5,
+        std::mem::size_of::<i32>() as u64,
+        &n as *const i32 as *const c_void,
+    );
+    encoder.set_bytes(
+        6,
+        std::mem::size_of::<usize>() as u64,
+        &stride as *const usize as *const c_void,
+    );
+    encoder.set_bytes(
+        7,
+        std::mem::size_of::<f32>() as u64,
+        &alpha as *const f32 as *const c_void,
+    );
+
+    let grid_dims = MTLSize {
+        width: 1,
+        height: b as u64,
+        depth: 1 as u64,
+    };
+    let group_dims = MTLSize {
+        width: 1024,
+        height: 1,
+        depth: 1,
     };
     encoder.use_resource(q_buffer, metal::MTLResourceUsage::Read);
     encoder.use_resource(k_buffer, metal::MTLResourceUsage::Read);

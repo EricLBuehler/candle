@@ -1037,15 +1037,16 @@ impl candle::CustomOp3 for Sdpa {
 
         let mut implementation_supports_use_case = q_head == k_head;
         let sdpa_full_supported_head_dim = q_head == 64 || q_head == 128;
+        let sdpa_vector_supported_head_dim = q_head == 64 || q_head == 96 || q_head == 128;
 
         // TODO: tune when add simd...
-        #[allow(clippy::absurd_extreme_comparisons)]
-        const SDPA_FULL_THRESHOLD: usize = 0;
+        const SDPA_FULL_THRESHOLD: usize = 2;
 
         let supports_sdpa_full =
             q_seq >= SDPA_FULL_THRESHOLD && sdpa_full_supported_head_dim && q_head == k_head;
+        let supports_sdpa_vector = q_seq == 1 && sdpa_vector_supported_head_dim;
 
-        implementation_supports_use_case &= supports_sdpa_full;
+        implementation_supports_use_case &= supports_sdpa_full || supports_sdpa_vector;
 
         if !implementation_supports_use_case {
             candle::bail!(
@@ -1070,24 +1071,54 @@ impl candle::CustomOp3 for Sdpa {
         };
 
         let command_buffer = q.device().command_buffer()?;
-        command_buffer.set_label("full_attention");
-        candle_metal_kernels::call_sdpa_full(
-            q.device().device(),
-            &command_buffer,
-            q.device().kernels(),
-            q_l.start_offset(),
-            q_l.dims(),
-            q.buffer(),
-            k_l.start_offset(),
-            k_l.dims(),
-            k.buffer(),
-            v_l.start_offset(),
-            v.buffer(),
-            &output,
-            self.scale,
-            itype,
-        )
-        .map_err(candle::Error::wrap)?;
+        if supports_sdpa_vector {
+            command_buffer.set_label("vector_attention");
+            candle_metal_kernels::call_sdpa_vector(
+                q.device().device(),
+                &command_buffer,
+                q.device().kernels(),
+                q_l.start_offset(),
+                q_l.dims(),
+                q.buffer(),
+                k_l.start_offset(),
+                k_l.dims(),
+                k_l.stride(),
+                k.buffer(),
+                v_l.start_offset(),
+                v.buffer(),
+                &output,
+                self.scale,
+                itype,
+            )
+            .map_err(candle::Error::wrap)?;
+        } else if supports_sdpa_full {
+            if q_l.dims()[2] != k_l.dims()[2] {
+                candle::bail!(
+                    "query and key sequence length must be equal if using full metal sdpa"
+                )
+            }
+
+            command_buffer.set_label("full_attention");
+            candle_metal_kernels::call_sdpa_full(
+                q.device().device(),
+                &command_buffer,
+                q.device().kernels(),
+                q_l.start_offset(),
+                q_l.dims(),
+                q.buffer(),
+                k_l.start_offset(),
+                k_l.dims(),
+                k.buffer(),
+                v_l.start_offset(),
+                v.buffer(),
+                &output,
+                self.scale,
+                itype,
+            )
+            .map_err(candle::Error::wrap)?;
+        } else {
+            candle::bail!("must be vector or full sdpa kernel");
+        }
 
         let newstorage = candle::MetalStorage::new(output, device.clone(), elem_count, q.dtype());
         Ok((newstorage, Shape::from_dims(&out_dims)))
