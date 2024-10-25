@@ -1127,11 +1127,23 @@ impl candle::CustomOp3 for Sdpa {
 
 /// Scaled dot product attention with a fused kernel.
 ///
+/// **Inputs shapes:**
 /// - `q`: (bs, qhead, seq, hidden)
-/// - `k`: (bs, kv_head, seq, hidden)
-/// - `k`: (bs, kv_head, seq, v_hidden)
-/// - `o`: (bs, qhead, seq, v_hidden)
+/// - `k`: (bs, kv_head, kv_seq, hidden)
+/// - `k`: (bs, kv_head, kv_seq, v_hidden)
 /// - `scale` is applied before softmax.
+/// 
+/// **Output shape:** (bs, qhead, seq, v_hidden)
+/// 
+/// ## On Metal:
+/// - If `seq` == 1:
+///     - Use a vectorized kernel
+///     - Supports `seq` != `kv_seq` (cross attn. support)
+///     - Supports GQA when `qhead` is a multiple of `kv_head`
+/// - Otherwise:
+///     - Use an alternate kernel
+///     - Requires `seq` == `kv_seq`
+///     - GQA is not supported (requires `qhead` == `kv_head`)
 pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, scale: f32) -> Result<Tensor> {
     q.apply_op3_no_bwd(k, v, &Sdpa { scale })
 }
