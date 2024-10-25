@@ -1877,12 +1877,12 @@ pub fn call_sdpa_vector(
     let stride = k_stride[1];
 
     let name = match (bk, itype) {
-        (64, SdpaDType::F16) => "sdpa_vector_half_64",
-        (96, SdpaDType::F16) => "sdpa_vector_half_96",
-        (128, SdpaDType::F16) => "sdpa_vector_half_128",
-        (64, SdpaDType::BF16) => "sdpa_vector_bfloat_64",
-        (96, SdpaDType::BF16) => "sdpa_vector_bfloat_96",
-        (128, SdpaDType::BF16) => "sdpa_vector_bfloat_128",
+        (64, SdpaDType::F16) => "sdpa_vector_float16_t_64",
+        (96, SdpaDType::F16) => "sdpa_vector_float16_t_96",
+        (128, SdpaDType::F16) => "sdpa_vector_float16_t_128",
+        (64, SdpaDType::BF16) => "sdpa_vector_bfloat16_t_64",
+        (96, SdpaDType::BF16) => "sdpa_vector_bfloat16_t_96",
+        (128, SdpaDType::BF16) => "sdpa_vector_bfloat16_t_128",
         (64, SdpaDType::F32) => "sdpa_vector_float_64",
         (96, SdpaDType::F32) => "sdpa_vector_float_96",
         (128, SdpaDType::F32) => "sdpa_vector_float_128",
