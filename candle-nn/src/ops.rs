@@ -1051,7 +1051,7 @@ impl candle::CustomOp3 for Sdpa {
 
         if !implementation_supports_use_case {
             candle::bail!(
-                "Metal does not support q dims {:?}, k dims {:?}, v dims {:?}. Need head dim 64, 128, and q_head == k_head",
+                "Meta SDPA does not support q dims {:?}, k dims {:?}, v dims {:?}.",
                 q_l.dims(),
                 k_l.dims(),
                 v_l.dims()

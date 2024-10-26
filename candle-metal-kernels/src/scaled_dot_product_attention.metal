@@ -1178,7 +1178,23 @@ instantiate_fast_inference_self_attention_kernel(
     float,
     16,
     16,
+    32,
+    2,
+    2);
+instantiate_fast_inference_self_attention_kernel(
+    float,
+    float,
+    16,
+    16,
     64,
+    2,
+    2);
+instantiate_fast_inference_self_attention_kernel(
+    float,
+    float,
+    16,
+    16,
+    96,
     2,
     2);
 instantiate_fast_inference_self_attention_kernel(
@@ -1189,8 +1205,19 @@ instantiate_fast_inference_self_attention_kernel(
     128,
     2,
     2);
+instantiate_fast_inference_self_attention_kernel(
+    float,
+    float,
+    16,
+    16,
+    256,
+    2,
+    2);
+instantiate_fast_inference_self_attention_kernel(half, half, 16, 16, 32, 2, 2);
 instantiate_fast_inference_self_attention_kernel(half, half, 16, 16, 64, 2, 2);
+instantiate_fast_inference_self_attention_kernel(half, half, 16, 16, 96, 2, 2);
 instantiate_fast_inference_self_attention_kernel(half, half, 16, 16, 128, 2, 2);
+instantiate_fast_inference_self_attention_kernel(half, half, 16, 16, 256, 2, 2);
 
 // SDPA vector instantiations
 #define instantiate_sdpa_vector(type, head_dim)                              \
@@ -1210,9 +1237,11 @@ instantiate_fast_inference_self_attention_kernel(half, half, 16, 16, 128, 2, 2);
       uint simd_lid [[thread_index_in_simdgroup]]);
 
 #define instantiate_sdpa_vector_heads(type) \
+  instantiate_sdpa_vector(type, 32)         \
   instantiate_sdpa_vector(type, 64)         \
   instantiate_sdpa_vector(type, 96)         \
-  instantiate_sdpa_vector(type, 128)
+  instantiate_sdpa_vector(type, 128)         \
+  instantiate_sdpa_vector(type, 256)
 
 instantiate_sdpa_vector_heads(float)
 instantiate_sdpa_vector_heads(bfloat16_t)

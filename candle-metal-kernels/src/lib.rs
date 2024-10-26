@@ -1725,15 +1725,21 @@ pub fn call_sdpa_full(
     const WN: usize = 2;
 
     let name = match (bk, itype) {
+        (32, SdpaDType::F16) => "steel_gemm_attention_bm_16_bn_16_bk_32_itype_half",
         (64, SdpaDType::F16) => "steel_gemm_attention_bm_16_bn_16_bk_64_itype_half",
+        (96, SdpaDType::F16) => "steel_gemm_attention_bm_16_bn_16_bk_96_itype_half",
         (128, SdpaDType::F16) => "steel_gemm_attention_bm_16_bn_16_bk_128_itype_half",
+        (256, SdpaDType::F16) => "steel_gemm_attention_bm_16_bn_16_bk_256_itype_half",
+        (32, SdpaDType::F32) => "steel_gemm_attention_bm_16_bn_16_bk_32_itype_float",
         (64, SdpaDType::F32) => "steel_gemm_attention_bm_16_bn_16_bk_64_itype_float",
+        (96, SdpaDType::F32) => "steel_gemm_attention_bm_16_bn_16_bk_96_itype_float",
         (128, SdpaDType::F32) => "steel_gemm_attention_bm_16_bn_16_bk_128_itype_float",
+        (256, SdpaDType::F32) => "steel_gemm_attention_bm_16_bn_16_bk_256_itype_float",
         (other, SdpaDType::F16 | SdpaDType::F32) => {
             return Err(MetalKernelError::SdpaHeadSizeMismatch {
                 variation: "full",
                 got: *other,
-                expected: vec![64, 128],
+                expected: vec![32, 64, 96, 128, 256],
             })
         }
         (_, SdpaDType::BF16) => {
@@ -1887,20 +1893,26 @@ pub fn call_sdpa_vector(
     let stride = k_stride[1];
 
     let name = match (bk, itype) {
+        (32, SdpaDType::F16) => "sdpa_vector_float16_t_32",
         (64, SdpaDType::F16) => "sdpa_vector_float16_t_64",
         (96, SdpaDType::F16) => "sdpa_vector_float16_t_96",
         (128, SdpaDType::F16) => "sdpa_vector_float16_t_128",
+        (256, SdpaDType::F16) => "sdpa_vector_float16_t_256",
+        (32, SdpaDType::BF16) => "sdpa_vector_bfloat16_t_32",
         (64, SdpaDType::BF16) => "sdpa_vector_bfloat16_t_64",
         (96, SdpaDType::BF16) => "sdpa_vector_bfloat16_t_96",
         (128, SdpaDType::BF16) => "sdpa_vector_bfloat16_t_128",
+        (256, SdpaDType::BF16) => "sdpa_vector_bfloat16_t_256",
+        (32, SdpaDType::F32) => "sdpa_vector_float_32",
         (64, SdpaDType::F32) => "sdpa_vector_float_64",
         (96, SdpaDType::F32) => "sdpa_vector_float_96",
         (128, SdpaDType::F32) => "sdpa_vector_float_128",
+        (256, SdpaDType::F32) => "sdpa_vector_float_256",
         (other, _) => {
             return Err(MetalKernelError::SdpaHeadSizeMismatch {
                 variation: "vector",
                 got: *other,
-                expected: vec![64, 96, 128],
+                expected: vec![32, 64, 96, 128, 256],
             })
         }
     };
