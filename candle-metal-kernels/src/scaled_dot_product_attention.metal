@@ -1,3 +1,5 @@
+// Updated from MLX commit has f70764a
+
 #include <metal_stdlib>
 #include <metal_simdgroup>
 
