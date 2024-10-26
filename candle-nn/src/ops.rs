@@ -1040,7 +1040,6 @@ impl candle::CustomOp3 for Sdpa {
         let supported_head_dim =
             q_head == 32 || q_head == 64 || q_head == 96 || q_head == 128 || q_head == 256;
 
-        // TODO: tune when add simd...
         const SDPA_FULL_THRESHOLD: usize = 2;
 
         let supports_sdpa_full =
@@ -1149,6 +1148,8 @@ impl candle::CustomOp3 for Sdpa {
 ///      - Computation is: softmax(tanh(qk^T*scale/cap)*cap)v
 ///
 /// **Output shape:** (bs, qhead, seq, v_hidden)
+/// 
+/// **Supported head dims:** 32, 64, 96, 128, 256.
 ///
 /// ## On Metal:
 /// - If `seq` == 1:
