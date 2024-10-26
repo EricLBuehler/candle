@@ -1683,6 +1683,7 @@ pub fn call_sdpa_full(
     v_buffer: &Buffer,
     output: &Buffer,
     alpha: f32,
+    softcapping: f32,
     itype: SdpaDType,
 ) -> Result<(), MetalKernelError> {
     #[derive(Debug)]
@@ -1713,6 +1714,7 @@ pub fn call_sdpa_full(
 
         batch_ndim: i32,
         alpha: f32,
+        softcapping: f32,
     }
 
     let bk = q_shape.last().unwrap();
@@ -1784,6 +1786,12 @@ pub fn call_sdpa_full(
     let gemm_sv_m_block_iterations = (m + BM - 1) / BM;
     let batch_ndim = batch_shape.len();
 
+    let alpha = if softcapping != 1. {
+        alpha / softcapping
+    } else {
+        alpha
+    };
+
     let params = MLXFastAttentionParams {
         m: m as i32,
         n: n as i32,
@@ -1805,6 +1813,7 @@ pub fn call_sdpa_full(
         gemm_sv_m_block_iterations: gemm_sv_m_block_iterations as i32,
         batch_ndim: batch_ndim as i32,
         alpha,
+        softcapping,
     };
     let batch_strides = [b_stride_q, b_stride_k, b_stride_v, b_stride_o];
 
@@ -1894,6 +1903,12 @@ pub fn call_sdpa_vector(
                 expected: vec![64, 96, 128],
             })
         }
+    };
+
+    let alpha = if softcapping != 1. {
+        alpha / softcapping
+    } else {
+        alpha
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name)?;

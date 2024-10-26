@@ -31,6 +31,7 @@ struct MLXFastAttentionParams {
 
   const int batch_ndim;
   const float alpha;
+  const float softcapping;
 };
 
 struct MLXScaledDotProductAttentionParams {
@@ -853,7 +854,8 @@ struct FastAttentionKernel {
       uint simd_group_id,
       uint simd_lane_id,
       short2 local_blocks,
-      float alpha) {
+      float alpha,
+      float softcapping) {
     if (simd_group_id == 0) {
       short row_offset = BM + float_padding;
       threadgroup float* maxes = Corrections;
@@ -874,6 +876,10 @@ struct FastAttentionKernel {
 
         for (short j = 0; j < local_blocks.x; j++) {
           float val = alpha * float(Ss[offset + j]);
+          if (softcapping != 1.) {
+            val = precise::tanh(val);
+            val = val * softcapping;
+          }
           m_ij = max(m_ij, val);
         }
 
@@ -883,6 +889,10 @@ struct FastAttentionKernel {
 
         for (short j = 0; j < local_blocks.x; j++) {
           float val = alpha * float(Ss[offset + j]);
+          if (softcapping != 1.) {
+            val = precise::tanh(val);
+            val = val * softcapping;
+          }
           float P_i_j = exp(val - m_ij);
           rowsum += P_i_j;
           P_i_j = P_i_j * exp(m_ij - m_i_new);
@@ -1014,7 +1024,8 @@ struct FastAttentionKernel {
           simd_group_id,
           simd_lane_id,
           short2(tgp_bn_qk, tgp_bm),
-          params->alpha);
+          params->alpha,
+          params->softcapping);
 
       loader_v.load_safe(short2(BK, tgp_bn_qk));
 

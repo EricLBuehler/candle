@@ -1094,10 +1094,6 @@ impl candle::CustomOp3 for Sdpa {
             )
             .map_err(candle::Error::wrap)?;
         } else if supports_sdpa_full {
-            if self.softcapping != 1. {
-                todo!()
-            }
-
             if q_l.dims()[2] != k_l.dims()[2] {
                 candle::bail!(
                     "query and key sequence length must be equal if using full metal sdpa"
@@ -1119,6 +1115,7 @@ impl candle::CustomOp3 for Sdpa {
                 v.buffer(),
                 &output,
                 self.scale,
+                self.softcapping,
                 itype,
             )
             .map_err(candle::Error::wrap)?;
@@ -1140,7 +1137,8 @@ impl candle::CustomOp3 for Sdpa {
 /// - `k`: (bs, kv_head, kv_seq, hidden)
 /// - `k`: (bs, kv_head, kv_seq, v_hidden)
 /// - `scale` is applied before softmax.
-/// - If `softcapping` != 1.0, `tanh` is applied to the attention weights and then `softcapping` is multiplied.
+/// - If `softcapping` != 1.0:
+///      - Computation is: softmax(tanh(qk^T*scale/cap)*cap)v
 ///
 /// **Output shape:** (bs, qhead, seq, v_hidden)
 ///
