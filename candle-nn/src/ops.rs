@@ -1037,18 +1037,26 @@ impl candle::CustomOp3 for Sdpa {
         let q_seq = q_l.dims()[2];
 
         let mut implementation_supports_use_case = q_head == k_head;
-        let sdpa_full_supported_head_dim = q_head == 64 || q_head == 128;
-        let sdpa_vector_supported_head_dim = q_head == 64 || q_head == 96 || q_head == 128;
+        let supported_head_dim =
+            q_head == 32 || q_head == 64 || q_head == 96 || q_head == 128 || q_head == 256;
 
         // TODO: tune when add simd...
         const SDPA_FULL_THRESHOLD: usize = 2;
 
         let supports_sdpa_full =
-            q_seq >= SDPA_FULL_THRESHOLD && sdpa_full_supported_head_dim && q_head == k_head;
-        let supports_sdpa_vector = q_seq == 1 && sdpa_vector_supported_head_dim;
+            q_seq >= SDPA_FULL_THRESHOLD && supported_head_dim && q_head == k_head;
+        let supports_sdpa_vector = q_seq == 1 && supported_head_dim;
 
         implementation_supports_use_case &= supports_sdpa_full || supports_sdpa_vector;
 
+        if !supported_head_dim {
+            candle::bail!(
+                "Meta SDPA does not support q head dim {q_head}: q dims {:?}, k dims {:?}, v dims {:?}.",
+                q_l.dims(),
+                k_l.dims(),
+                v_l.dims()
+            );
+        }
         if !implementation_supports_use_case {
             candle::bail!(
                 "Meta SDPA does not support q dims {:?}, k dims {:?}, v dims {:?}.",
