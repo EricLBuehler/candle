@@ -975,6 +975,7 @@ impl Module for Identity {
     }
 }
 
+#[allow(dead_code)]
 struct Sdpa {
     scale: f32,
     softcapping: f32,
@@ -1148,7 +1149,7 @@ impl candle::CustomOp3 for Sdpa {
 ///      - Computation is: softmax(tanh(qk^T*scale/cap)*cap)v
 ///
 /// **Output shape:** (bs, qhead, seq, v_hidden)
-/// 
+///
 /// **Supported head dims:** 32, 64, 96, 128, 256.
 ///
 /// ## On Metal:
