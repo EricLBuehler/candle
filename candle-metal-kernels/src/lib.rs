@@ -1867,6 +1867,7 @@ pub fn call_sdpa_vector(
     v_buffer: &Buffer,
     output: &Buffer,
     alpha: f32,
+    softcapping: f32,
     itype: SdpaDType,
 ) -> Result<(), MetalKernelError> {
     let bk = q_shape.last().unwrap();
@@ -1927,6 +1928,11 @@ pub fn call_sdpa_vector(
         7,
         std::mem::size_of::<f32>() as u64,
         &alpha as *const f32 as *const c_void,
+    );
+    encoder.set_bytes(
+        8,
+        std::mem::size_of::<f32>() as u64,
+        &softcapping as *const f32 as *const c_void,
     );
 
     let grid_dims = MTLSize {

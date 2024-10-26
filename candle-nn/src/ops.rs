@@ -977,6 +977,7 @@ impl Module for Identity {
 
 struct Sdpa {
     scale: f32,
+    softcapping: f32,
 }
 
 impl candle::CustomOp3 for Sdpa {
@@ -1088,10 +1089,15 @@ impl candle::CustomOp3 for Sdpa {
                 v.buffer(),
                 &output,
                 self.scale,
+                self.softcapping,
                 itype,
             )
             .map_err(candle::Error::wrap)?;
         } else if supports_sdpa_full {
+            if self.softcapping != 1. {
+                todo!()
+            }
+
             if q_l.dims()[2] != k_l.dims()[2] {
                 candle::bail!(
                     "query and key sequence length must be equal if using full metal sdpa"
@@ -1127,14 +1133,17 @@ impl candle::CustomOp3 for Sdpa {
 
 /// Scaled dot product attention with a fused kernel.
 ///
+/// Computes softmax(qk^T*scale)v.
+///
 /// **Inputs shapes:**
 /// - `q`: (bs, qhead, seq, hidden)
 /// - `k`: (bs, kv_head, kv_seq, hidden)
 /// - `k`: (bs, kv_head, kv_seq, v_hidden)
 /// - `scale` is applied before softmax.
-/// 
+/// - If `softcapping` != 1.0, `tanh` is applied to the attention weights and then `softcapping` is multiplied.
+///
 /// **Output shape:** (bs, qhead, seq, v_hidden)
-/// 
+///
 /// ## On Metal:
 /// - If `seq` == 1:
 ///     - Use a vectorized kernel
@@ -1144,6 +1153,6 @@ impl candle::CustomOp3 for Sdpa {
 ///     - Use an alternate kernel
 ///     - Requires `seq` == `kv_seq`
 ///     - GQA is not supported (requires `qhead` == `kv_head`)
-pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, scale: f32) -> Result<Tensor> {
-    q.apply_op3_no_bwd(k, v, &Sdpa { scale })
+pub fn sdpa(q: &Tensor, k: &Tensor, v: &Tensor, scale: f32, softcapping: f32) -> Result<Tensor> {
+    q.apply_op3_no_bwd(k, v, &Sdpa { scale, softcapping })
 }

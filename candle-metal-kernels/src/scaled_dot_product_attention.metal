@@ -54,6 +54,7 @@ template <typename T, int D>
     const constant int& N,
     const constant size_t& k_stride,
     const constant float& scale,
+    const constant float& softcapping,
     uint3 tid [[threadgroup_position_in_grid]],
     uint simd_gid [[simdgroup_index_in_threadgroup]],
     uint simd_lid [[thread_index_in_simdgroup]]) {
@@ -105,6 +106,10 @@ template <typename T, int D>
       score += q[i] * k[i];
     }
     score = simd_sum(score);
+    if (softcapping != 1.) {
+      score = precise::tanh(score);
+      score = score * softcapping;
+    }
 
     // Update the accumulators
     U new_max = max(max_score, score);
@@ -1188,6 +1193,7 @@ instantiate_fast_inference_self_attention_kernel(half, half, 16, 16, 128, 2, 2);
       const constant int& N,                                                 \
       const constant size_t& k_stride,                                       \
       const constant float& scale,                                           \
+      const constant float& softcapping,                                     \
       uint3 tid [[threadgroup_position_in_grid]],                            \
       uint simd_gid [[simdgroup_index_in_threadgroup]],                      \
       uint simd_lid [[thread_index_in_simdgroup]]);
