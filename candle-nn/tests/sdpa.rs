@@ -228,25 +228,35 @@ mod metal_sdpa_tests {
 
     #[test]
     fn attn_softmax_mask_scale() -> candle::Result<()> {
-        use candle::{Device, Tensor};
+        use candle::{DType, Device, Tensor};
 
         let device = Device::new_metal(0)?;
 
-        let tensor = Tensor::randn(0f32, 1f32, (4, 32, 64, 64), &device)?;
-        let truemask = Tensor::full(f32::MIN, (64, 64), &device)?.contiguous()?;
+        let tensor = Tensor::randn(0f32, 1f32, (4, 32, 64, 64), &device)?.to_dtype(DType::F16)?;
+        let truemask = Tensor::full(half::f16::MIN, (64, 64), &device)?
+            .contiguous()?
+            .to_dtype(DType::F16)?;
 
         let scale = 0.1f32;
 
         let ground_truth =
-            candle_nn::ops::softmax_last_dim(&(tensor.broadcast_add(&truemask)? * scale as f64)?)?;
+            candle_nn::ops::softmax_last_dim(&(tensor.broadcast_add(&truemask)? * scale as f64)?)?
+                .to_dtype(DType::F32)?;
 
-        let softmax_out = candle_nn::ops::attn_softmax_last_dim(&tensor, &truemask, scale)?;
+        let softmax_out = candle_nn::ops::attn_softmax_last_dim(&tensor, &truemask, scale)?
+            .to_dtype(DType::F32)?;
 
         let error: f32 = ((&ground_truth - &softmax_out)?.abs()? / &ground_truth.abs()?)?
             .sum_all()?
+            .to_dtype(DType::F32)?
             .to_scalar()?;
+        let mean_diff: f32 = (&ground_truth - &softmax_out)?
+            .abs()?
+            .mean_all()?
+            .to_scalar()?;
+        dbg!(&mean_diff);
 
-        assert!(error < 1e-5);
+        assert!(error < 1e-5, "{error}");
 
         Ok(())
     }
