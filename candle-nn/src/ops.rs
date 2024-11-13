@@ -495,7 +495,6 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
         }
 
         let elem_count = a_l.shape().elem_count();
-        // let float_buf = device.new_buffer(elem_count, DType::F32, "attn-softmax")?;
         let output = device.new_buffer(elem_count, a_s.dtype(), "attn-softmax")?;
         candle_metal_kernels::call_last_attn_softmax(
             device.metal_device(),
@@ -508,7 +507,6 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
             a_l.dims(),
             self.scale,
             ty,
-            // &float_buf,
             &output,
         )
         .map_err(candle::Error::wrap)?;
@@ -519,7 +517,7 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
 
 /// Softmax with fused broadcast addition of a mask and scale.
 /// Equivalent to:
-/// ```no_run
+/// ```ignore
 /// candle_nn::ops::softmax_last_dim(&(xs.broadcast_add(&mask)? * scale as f64)?)?
 /// ```
 /// - `xs` must be a rank-4 tensor
