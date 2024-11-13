@@ -583,9 +583,9 @@ kernel void attn_soft_max(
     const int64_t i02 = (tgpig - i03*ne02*ne01) / ne01;
     const int64_t i01 = (tgpig - i03*ne02*ne01 - i02*ne01);
 
-    device const float * psrc0 = (device const float *) src0 + (i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00);
-    device const     T * pmask = src1 != src0 ? (device const    T *) src1         + i01*ne00 : nullptr;
-    device       float * pdst  = (device       float *) dst  + (i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00);
+    device const T * psrc0 =                (device const T *) src0 + (i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00);
+    device const T * pmask = src1 != src0 ? (device const T *) src1 + i01*ne00 : nullptr;
+    device       T * pdst  =                (device       T *) dst  + (i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00);
 
     float slope = 1.0f;
 
@@ -593,7 +593,7 @@ kernel void attn_soft_max(
     float lmax = -INFINITY;
 
     for (int i00 = tpitg; i00 < ne00; i00 += ntg) {
-        lmax = MAX(lmax, psrc0[i00]*scale + (pmask ? slope*pmask[i00] : 0.0f));
+        lmax = MAX(lmax, ((float)psrc0[i00])*scale + (pmask ? slope*((float)pmask[i00]) : 0.0f));
     }
 
     // find the max value in the block
@@ -618,9 +618,9 @@ kernel void attn_soft_max(
     // parallel sum
     float lsum = 0.0f;
     for (int i00 = tpitg; i00 < ne00; i00 += ntg) {
-        const float exp_psrc0 = exp((psrc0[i00]*scale + (pmask ? slope*pmask[i00] : 0.0f)) - max_val);
+        const float exp_psrc0 = exp((((float)psrc0[i00])*scale + (pmask ? slope*((float)pmask[i00]) : 0.0f)) - max_val);
         lsum += exp_psrc0;
-        pdst[i00] = exp_psrc0;
+        pdst[i00] = static_cast<T>(exp_psrc0);
     }
 
     // This barrier fixes a failing test
@@ -649,11 +649,11 @@ kernel void attn_soft_max(
     const float inv_sum = 1.0f/sum;
 
     for (int i00 = tpitg; i00 < ne00; i00 += ntg) {
-        pdst[i00] *= inv_sum;
+        pdst[i00] *= static_cast<T>(inv_sum);
     }
 }
 
-template<typename T>
+template<typename T, typename S>
 kernel void attn_soft_max_4(
         device const  char * src0,
         device const  char * src1,
@@ -672,17 +672,17 @@ kernel void attn_soft_max_4(
     const int64_t i02 = (tgpig - i03*ne02*ne01) / ne01;
     const int64_t i01 = (tgpig - i03*ne02*ne01 - i02*ne01);
 
-    device const T * psrc4 = (device const T *) src0 + (i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00)/4;
-    device const      T * pmask = src1 != src0 ? (device const     T *) src1         + i01*ne00/4 : nullptr;
-    device       T * pdst4 = (device       T *) dst  + (i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00)/4;
+    device const T * psrc4 =                (device const T *) src0 + (i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00)/4;
+    device const T * pmask = src1 != src0 ? (device const T *) src1 + i01*ne00/4 : nullptr;
+    device       T * pdst4 =                (device       T *) dst  + (i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00)/4;
 
     float slope = 1.0f;
 
     // parallel max
-    T lmax4 = -INFINITY;
+    float4 lmax4 = -INFINITY;
 
     for (int i00 = tpitg; i00 < ne00/4; i00 += ntg) {
-        lmax4 = fmax(lmax4, psrc4[i00]*scale + (T)((pmask ? slope*pmask[i00] : 0.0f)));
+        lmax4 = fmax(lmax4, ((float4)psrc4[i00])*scale + (float4)((pmask ? slope*((float4)pmask[i00]) : 0.0f)));
     }
 
     const float lmax = MAX(MAX(lmax4[0], lmax4[1]), MAX(lmax4[2], lmax4[3]));
@@ -706,11 +706,11 @@ kernel void attn_soft_max_4(
     }
 
     // parallel sum
-    T lsum4 = 0.0f;
+    float4 lsum4 = 0.0f;
     for (int i00 = tpitg; i00 < ne00/4; i00 += ntg) {
-        const T exp_psrc4 = exp((psrc4[i00]*scale + (T)((pmask ? slope*pmask[i00] : 0.0f))) - max_val);
+        const float4 exp_psrc4 = exp((((float4)psrc4[i00])*scale + (float4)((pmask ? slope*((float4)pmask[i00]) : 0.0f))) - max_val);
         lsum4 += exp_psrc4;
-        pdst4[i00] = exp_psrc4;
+        pdst4[i00] = static_cast<T>(exp_psrc4);
     }
 
     const float lsum = lsum4[0] + lsum4[1] + lsum4[2] + lsum4[3];
@@ -741,7 +741,7 @@ kernel void attn_soft_max_4(
     const float inv_sum = 1.0f/sum;
 
     for (int i00 = tpitg; i00 < ne00/4; i00 += ntg) {
-        pdst4[i00] *= inv_sum;
+        pdst4[i00] = pdst4[i00] * static_cast<T>((S)inv_sum);
     }
 }
 
@@ -774,11 +774,11 @@ SOFTMAX(softmax_f32, float)
 SOFTMAX(softmax_f16, half)
 // Softmax for attention
 typedef decltype(attn_soft_max<float>)    attn_soft_max_t;
-typedef decltype(attn_soft_max_4<float4>) attn_soft_max_4_t;
+typedef decltype(attn_soft_max_4<float4, float>) attn_soft_max_4_t;
 template [[host_name("attn_soft_max_f16")]]   kernel attn_soft_max_t   attn_soft_max<half>;
 template [[host_name("attn_soft_max_f32")]]   kernel attn_soft_max_t   attn_soft_max<float>;
-template [[host_name("attn_soft_max_f16_4")]] kernel attn_soft_max_4_t attn_soft_max_4<half4>;
-template [[host_name("attn_soft_max_f32_4")]] kernel attn_soft_max_4_t attn_soft_max_4<float4>;
+template [[host_name("attn_soft_max_f16_4")]] kernel attn_soft_max_4_t attn_soft_max_4<half4, half>;
+template [[host_name("attn_soft_max_f32_4")]] kernel attn_soft_max_4_t attn_soft_max_4<float4, float>;
 RMSNORM(rmsnorm_f32, float)
 RMSNORM(rmsnorm_f16, half)
 LAYERNORM(layernorm_f32, float)
@@ -819,8 +819,8 @@ ARGMIN(fast_argmin_bf16, bfloat, HUGE_VALBF)
 ARGMAX(fast_argmax_bf16, bfloat, -HUGE_VALBF)
 SOFTMAX(softmax_bf16, bfloat)
 // // Softmax for attention
-// template [[host_name("attn_soft_max_bf16")]]   kernel attn_soft_max_t   attn_soft_max<bfloat>;
-// template [[host_name("attn_soft_max_bf16_4")]] kernel attn_soft_max_4_t attn_soft_max_4<bfloat4>;
+template [[host_name("attn_soft_max_bf16")]]   kernel attn_soft_max_t   attn_soft_max<bfloat>;
+template [[host_name("attn_soft_max_bf16_4")]] kernel attn_soft_max_4_t attn_soft_max_4<bfloat4, bfloat>;
 RMSNORM(rmsnorm_bf16, bfloat)
 LAYERNORM(layernorm_bf16, bfloat)
 ROPE(rope_bf16, rope_i_bf16, rope_thd_bf16, bfloat)
