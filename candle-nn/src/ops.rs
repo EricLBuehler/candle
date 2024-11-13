@@ -445,12 +445,12 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
 
     fn cpu_fwd(
         &self,
-        s1: &CpuStorage,
-        l1: &Layout,
-        s2: &CpuStorage,
-        l2: &Layout,
+        _a_s: &CpuStorage,
+        _a_l: &Layout,
+        _mask_s: &CpuStorage,
+        _mask_l: &Layout,
     ) -> Result<(CpuStorage, Shape)> {
-        todo!()
+        candle::bail!("cpu attn-softmax-last-dim is not implemented");
     }
 
     #[cfg(feature = "metal")]
@@ -480,6 +480,9 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
             candle::bail!("Non contiguous mask for attn-softmax-last-dim is not implemented");
         }
 
+        if a_l.dims().len() != 4 {
+            candle::bail!("attn-softmax-last-dim expects xs of rank 2");
+        }
         if mask_l.dims().len() != 2 {
             candle::bail!("attn-softmax-last-dim expects mask of rank 2");
         }
@@ -510,8 +513,22 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
     }
 }
 
+/// Softmax with fused broadcast addition of a mask and scale.
+/// Equivalent to:
+/// ```no_run
+/// candle_nn::ops::softmax_last_dim(&(xs.broadcast_add(&mask)? * scale as f64)?)?
+/// ```
+/// - `xs` must be a rank-4 tensor
+/// - `mask` must be a rank-2 matrix
+/// - The last 2 dimensions of `xs` must match the dimensions of `mask`.
+///
+/// Note: if the last dim of `xs` is a multiple of 4, a vectorized implementation will be used.
 pub fn attn_softmax_last_dim(xs: &Tensor, mask: &Tensor, scale: f32) -> Result<Tensor> {
-    xs.apply_op2_no_bwd(mask, &AttnSoftmaxLastDim { scale })
+    if xs.device().is_metal() {
+        xs.apply_op2_no_bwd(mask, &AttnSoftmaxLastDim { scale })
+    } else {
+        softmax_last_dim(&(xs.broadcast_add(&mask)? * scale as f64)?)
+    }
 }
 
 #[derive(Debug, Clone)]
