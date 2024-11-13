@@ -434,6 +434,8 @@ pub fn softmax_last_dim(xs: &Tensor) -> Result<Tensor> {
     xs.apply_op1_no_bwd(&SoftmaxLastDim)
 }
 
+// TODO: need cpu and cuda impls
+#[allow(dead_code)]
 struct AttnSoftmaxLastDim {
     scale: f32,
 }
