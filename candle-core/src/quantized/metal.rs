@@ -150,6 +150,63 @@ impl QMetalStorage {
         self.buffer.length() as usize
     }
 
+    fn fwd_mv(
+        &self,
+        self_shape: &Shape,
+        storage: &MetalStorage,
+        layout: &crate::Layout,
+    ) -> Result<(MetalStorage, Shape)> {
+        use crate::MetalError;
+
+        if !layout.is_contiguous() {
+            crate::bail!("input tensor is not contiguous {layout:?}")
+        }
+        let src_shape = layout.shape();
+        // self is transposed so n is first then k.
+        if src_shape.rank() < 2 {
+            crate::bail!("input tensor has only one dimension {layout:?}")
+        }
+        let (n, k) = self_shape.dims2()?;
+        let mut dst_shape = src_shape.dims().to_vec();
+
+        // We always use a single batch dimension and stack all the tensors in the batch on the
+        // second dimension as the implementation in candle-metal-kernels doesn't handle batch
+        // properly.
+        let m = match dst_shape.len() {
+            3 => dst_shape[0] * dst_shape[1],
+            2 => dst_shape[0],
+            n => crate::bail!("Invalid rank {n} for quantized matmul metal"),
+        };
+        let last_k = dst_shape.pop().unwrap();
+        if last_k != k {
+            crate::bail!("input tensor {layout:?} incompatible with {:?}", self_shape)
+        }
+        dst_shape.push(n);
+        let dst_shape = Shape::from(dst_shape);
+        let device = storage.device().clone();
+        let dst = device.new_buffer(dst_shape.elem_count(), DType::F32, "qmatmul")?;
+        let command_buffer = device.command_buffer()?;
+        // In some cases it would be better to use the mm variant, though it has its drawbacks
+        // around memory alignemnt.
+        for batch_id in 0..m {
+            candle_metal_kernels::call_quantized_matmul_mv_t(
+                device.device(),
+                &command_buffer,
+                device.kernels(),
+                self.dtype.into(),
+                (1, 1, n, k),
+                storage.buffer(),
+                (layout.start_offset() + batch_id * k) * storage.dtype().size_in_bytes(),
+                &self.buffer,
+                batch_id * n * DType::F32.size_in_bytes(),
+                &dst,
+            )
+            .map_err(MetalError::from)?;
+        }
+        let dst_storage = crate::MetalStorage::new(dst, device, dst_shape.elem_count(), DType::F32);
+        Ok((dst_storage, dst_shape))
+    }
+
     pub fn fwd(
         &self,
         self_shape: &Shape,
@@ -170,9 +227,21 @@ impl QMetalStorage {
         let k = self_shape.dim(D::Minus1)?;
         let mut dst_shape = src_shape.dims().to_vec();
 
-        let m = dst_shape[..src_shape.dims().len() - self_shape.dims().len()]
-            .into_iter()
+        if src_shape.rank() < self_shape.rank() {
+            crate::bail!(
+                "input rank ({}) must be >= weight rank ({})",
+                src_shape.rank(),
+                self_shape.rank()
+            )
+        }
+
+        let m = dst_shape[..src_shape.rank() - self_shape.rank()]
+            .iter()
             .product::<usize>();
+        if m == 1 {
+            return self.fwd_mv(self_shape, storage, layout);
+        }
+
         let last_k = dst_shape.pop().unwrap();
         if last_k != k {
             crate::bail!("input tensor {layout:?} incompatible with {:?}", self_shape)
@@ -183,59 +252,46 @@ impl QMetalStorage {
         let dst = device.new_buffer(dst_shape.elem_count(), DType::F32, "qmatmul")?;
         let command_buffer = device.command_buffer()?;
 
-        if m > 1 {
-            assert_eq!(storage.dtype(), DType::F32); // todo!!!!!!!!!!
+        assert_eq!(storage.dtype(), DType::F32);
 
-            let new_l = crate::Layout::contiguous(
-                [vec![1; 4 - self_shape.rank()], self_shape.dims().to_vec()].concat(),
-            );
-            let src0_stride = new_l
-                .stride()
-                .into_iter()
-                .map(|x| {
-                    (*x as f32 * (self.dtype.type_size() as f32 / self.dtype.block_size() as f32))
-                        as usize
-                })
-                .collect::<Vec<_>>();
-
-            candle_metal_kernels::call_quantized_matmul_mm_t(
-                device.device(),
-                &command_buffer,
-                device.kernels(),
-                self.dtype.into(),
-                &new_l.dims(),
-                &src0_stride,
-                &self.buffer,
-                layout.dims(),
-                &layout
-                    .stride()
-                    .into_iter()
-                    .map(|x| x * DType::F32.size_in_bytes())
-                    .collect::<Vec<_>>(),
-                storage.buffer(),
-                layout.start_offset() * storage.dtype().size_in_bytes(),
-                dst_shape.dims(),
-                0,
-                &dst,
-            )
-            .map_err(MetalError::from)?;
-        } else {
-            for batch_id in 0..m {
-                candle_metal_kernels::call_quantized_matmul_mv_t(
-                    device.device(),
-                    &command_buffer,
-                    device.kernels(),
-                    self.dtype.into(),
-                    (1, 1, n, k),
-                    storage.buffer(),
-                    (layout.start_offset() + batch_id * k) * storage.dtype().size_in_bytes(),
-                    &self.buffer,
-                    batch_id * n * DType::F32.size_in_bytes(),
-                    &dst,
-                )
-                .map_err(MetalError::from)?;
-            }
+        if self_shape.rank() > 4 {
+            crate::bail!("weight rank ({}) must be <= 4", self_shape.rank())
         }
+
+        let new_l = crate::Layout::contiguous(
+            [vec![1; 4 - self_shape.rank()], self_shape.dims().to_vec()].concat(),
+        );
+        let src0_stride = new_l
+            .stride()
+            .iter()
+            .map(|x| {
+                (*x as f32 * (self.dtype.type_size() as f32 / self.dtype.block_size() as f32))
+                    as usize
+            })
+            .collect::<Vec<_>>();
+
+        candle_metal_kernels::call_quantized_matmul_mm_t(
+            device.device(),
+            &command_buffer,
+            device.kernels(),
+            self.dtype.into(),
+            new_l.dims(),
+            &src0_stride,
+            &self.buffer,
+            layout.dims(),
+            &layout
+                .stride()
+                .iter()
+                .map(|x| x * DType::F32.size_in_bytes())
+                .collect::<Vec<_>>(),
+            storage.buffer(),
+            layout.start_offset() * storage.dtype().size_in_bytes(),
+            dst_shape.dims(),
+            0,
+            &dst,
+        )
+        .map_err(MetalError::from)?;
+
         let dst_storage = crate::MetalStorage::new(dst, device, dst_shape.elem_count(), DType::F32);
         Ok((dst_storage, dst_shape))
     }
