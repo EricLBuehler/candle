@@ -46,6 +46,41 @@ fn test_matmul(
     Ok(())
 }
 
+#[test]
+fn test_matmul_mm() -> Result<()> {
+    let dtype = GgmlDType::Q8_0;
+    let device = Device::new_metal(0)?;
+
+    let m = 32;
+    let n = 32;
+    let k = 32;
+    let lhs = (0..(m * k))
+        .map(|v| v as f32 / (m * k) as f32)
+        .collect::<Vec<_>>();
+    let rhs = (0..(k * n))
+        .map(|v| v as f32 / (n * k) as f32)
+        .collect::<Vec<_>>();
+
+    let lhs = Tensor::from_slice(&lhs, (m, k), &device)?;
+    let rhs = Tensor::from_slice(&rhs, (1, 1, k, n), &device)?.repeat((5, 20, 1, 1))?;
+    let mm = lhs.broadcast_matmul(&rhs)?;
+    let qtensor = quantized::QTensor::quantize(&lhs.t()?, dtype)?;
+    let matmul = quantized::QMatMul::from_qtensor(qtensor)?;
+    let res = matmul.forward(&rhs)?;
+
+    let error: f32 = ((&mm - &res)?.abs()? / &mm.abs()?)?
+        .sum_all()?
+        .to_scalar()?;
+
+    let error = error / res.elem_count() as f32;
+    assert!(
+        error <= 0.001,
+        "Error {error} is too big. \nExpected:\n {mm} \nFound:\n {res}\n for {dtype:?}"
+    );
+
+    Ok(())
+}
+
 fn quantized_matmul(device: &Device) -> Result<()> {
     let (m, k, n) = (3, 64, 4);
     let lhs_s = (0..(m * k)).map(|v| v as f32).collect::<Vec<_>>();
