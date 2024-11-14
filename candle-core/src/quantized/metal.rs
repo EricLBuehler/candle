@@ -257,11 +257,10 @@ impl QMetalStorage {
         if self_shape.rank() > 4 {
             crate::bail!("weight rank ({}) must be <= 4", self_shape.rank())
         }
-
-        let new_l = crate::Layout::contiguous(
+        let src0_l = crate::Layout::contiguous(
             [vec![1; 4 - self_shape.rank()], self_shape.dims().to_vec()].concat(),
         );
-        let src0_stride = new_l
+        let src0_stride = src0_l
             .stride()
             .iter()
             .map(|x| {
@@ -270,22 +269,29 @@ impl QMetalStorage {
             })
             .collect::<Vec<_>>();
 
+        if src_shape.rank() > 4 {
+            crate::bail!("weight rank ({}) must be <= 4", src_shape.rank())
+        }
+        let src1_l = crate::Layout::contiguous(
+            [vec![1; 4 - src_shape.rank()], src_shape.dims().to_vec()].concat(),
+        );
+
         candle_metal_kernels::call_quantized_matmul_mm_t(
             device.device(),
             &command_buffer,
             device.kernels(),
             self.dtype.into(),
-            new_l.dims(),
+            src0_l.dims(),
             &src0_stride,
             &self.buffer,
-            layout.dims(),
-            &layout
+            src1_l.dims(),
+            &src1_l
                 .stride()
                 .iter()
                 .map(|x| x * DType::F32.size_in_bytes())
                 .collect::<Vec<_>>(),
             storage.buffer(),
-            layout.start_offset() * storage.dtype().size_in_bytes(),
+            src1_l.start_offset() * storage.dtype().size_in_bytes(),
             dst_shape.dims(),
             0,
             &dst,
