@@ -238,9 +238,9 @@ impl QMetalStorage {
         let m = dst_shape[..src_shape.rank() - self_shape.rank()]
             .iter()
             .product::<usize>();
-        if m == 1 {
-            return self.fwd_mv(self_shape, storage, layout);
-        }
+        // if m == 1 {
+        //     return self.fwd_mv(self_shape, storage, layout);
+        // }
 
         let last_k = dst_shape.pop().unwrap();
         if last_k != k {
