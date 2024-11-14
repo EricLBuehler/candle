@@ -46,6 +46,7 @@ fn test_matmul(
     Ok(())
 }
 
+#[cfg(feature = "metal")]
 #[test]
 fn test_matmul_mm() -> Result<()> {
     let dtype = GgmlDType::Q8_0;
