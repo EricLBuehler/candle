@@ -3,6 +3,7 @@
 
 #if __CUDA_ARCH__ >= 800
 #include "cuda_fp8.h"
+#include "cuda_bf16.h"
 
 BINARY_OP(__nv_bfloat16, badd_bf16, x + y)
 BINARY_OP(__nv_bfloat16, bdiv_bf16, x / y)

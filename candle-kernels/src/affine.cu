@@ -30,6 +30,7 @@ extern "C" __global__ void FN_NAME(  \
 
 #if __CUDA_ARCH__ >= 800
 #include "cuda_fp8.h"
+#include "cuda_bf16.h"
 
 AFFINE_OP(__nv_bfloat16, affine_bf16, x * mul + add)
 
