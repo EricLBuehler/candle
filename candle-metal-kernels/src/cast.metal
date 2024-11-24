@@ -72,7 +72,7 @@ kernel void FN_NAME_STRIDED( \
     output[tid] = static_cast<RIGHT_TYPENAME>(static_cast<IR_TYPENAME>(input[get_strided_index(tid, num_dims, dims, strides)])); \
 } \
 
-uint8_t f32_to_fp8e4m3(float x) {
+METAL_FUNC uint8_t f32_to_fp8e4m3(float x) {
     // Transmute float to uint32
     uint32_t xbits = as_type<uint32_t>(x);
 
@@ -132,7 +132,7 @@ uint8_t f32_to_fp8e4m3(float x) {
     return res | sign;
 }
 
-ushort fp8e4m3_to_fp16(uchar x) {
+METAL_FUNC ushort fp8e4m3_to_fp16(uchar x) {
     ushort ur = (ushort(x) << 8);
 
     ushort sign = ur & 0x8000U;
