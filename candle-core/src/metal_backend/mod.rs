@@ -2174,7 +2174,7 @@ impl BackendDevice for MetalDevice {
             CpuStorageRef::F16(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorageRef::F32(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorageRef::F64(storage) => (storage.len(), self.new_buffer_with_data(storage)),
-            CpuStorageRef::F8E4M3(_) => crate::bail!("Metal device does not yet support F8E4M3."),
+            CpuStorageRef::F8E4M3(storage) => (storage.len(), self.new_buffer_with_data(storage)),
         };
         Ok(Self::Storage::new(buffer?, self.clone(), count, T::DTYPE))
     }
@@ -2190,7 +2190,7 @@ impl BackendDevice for MetalDevice {
             CpuStorage::F16(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorage::F32(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorage::F64(storage) => (storage.len(), self.new_buffer_with_data(storage)),
-            CpuStorage::F8E4M3(_) => crate::bail!("Metal device does not yet support F8E4M3."),
+            CpuStorage::F8E4M3(storage) => (storage.len(), self.new_buffer_with_data(storage)),
         };
         Ok(Self::Storage::new(
             buffer?,
