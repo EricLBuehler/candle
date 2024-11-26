@@ -2103,7 +2103,6 @@ pub fn call_sdpa_vector_2pass(
         let vstride = v_stride[1];
 
         let alpha = if softcapping != 1. {
-            todo!();
             alpha / softcapping
         } else {
             alpha
@@ -2130,10 +2129,10 @@ pub fn call_sdpa_vector_2pass(
                 n,
                 kstride,
                 vstride,
-                alpha
+                alpha,
+                softcapping
             )
         );
-        // softcapping // TODO!!!
 
         let grid_dims = MTLSize {
             width: 1,
