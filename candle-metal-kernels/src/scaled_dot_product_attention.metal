@@ -1439,7 +1439,7 @@ instantiate_fast_inference_self_attention_kernel(half, half, 16, 16, 256, 2, 2);
       const device float* partials [[buffer(0)]],                            \
       const device float* sums [[buffer(1)]],                                \
       const device float* maxs [[buffer(2)]],                                \
-      device T* out [[buffer(3)]],                                           \
+      device type* out [[buffer(3)]],                                           \
       uint3 tid [[threadgroup_position_in_grid]],                            \
       uint simd_gid [[simdgroup_index_in_threadgroup]],                      \
       uint simd_lid [[thread_index_in_simdgroup]]);                          \
