@@ -503,7 +503,7 @@ instantiate_metal_math_funcs(
 
 } // namespace precise
 
-} // name
+} // namespace metal
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
