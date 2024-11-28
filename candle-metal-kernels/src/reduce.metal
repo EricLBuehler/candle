@@ -253,7 +253,6 @@ bfloat_inplace_op_addr_space_helper(/, operator/=);
 typedef struct _MLX_BFloat16 bfloat16_t;
 
 #define HUGE_VALBF _MLX_BFloat16(0x7F80, _MLX_BFloat16::bits_to_bfloat())
-typedef matrix<bfloat16_t, 4, 1> bfloat4;
 
 #endif
 
@@ -1075,7 +1074,9 @@ ARGMAX(fast_argmax_bf16, bfloat16_t, -HUGE_VALBF)
 SOFTMAX(softmax_bf16, bfloat16_t)
 // // Softmax for attention
 template [[host_name("attn_soft_max_bf16")]]   kernel attn_soft_max_t   attn_soft_max<bfloat16_t>;
+#if defined(__HAVE_BFLOAT__)
 template [[host_name("attn_soft_max_bf16_4")]] kernel attn_soft_max_4_t attn_soft_max_4<bfloat4, bfloat16_t>;
+#endif
 RMSNORM(rmsnorm_bf16, bfloat16_t)
 LAYERNORM(layernorm_bf16, bfloat16_t)
 ROPE(rope_bf16, rope_i_bf16, rope_thd_bf16, bfloat16_t)
