@@ -441,7 +441,7 @@ kernel void cast_f8e4m3_bf16(
         return;
     }
     half x = as_type<half>(fp8e4m3_to_fp16(input[tid]));
-    output[tid] = static_cast<bfloat>(x);
+    output[tid] = static_cast<bfloat16_t>(x);
 }
 
 kernel void cast_f32_f8e4m3(
