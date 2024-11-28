@@ -253,6 +253,7 @@ bfloat_inplace_op_addr_space_helper(/, operator/=);
 typedef struct _MLX_BFloat16 bfloat16_t;
 
 #define HUGE_VALBF _MLX_BFloat16(0x7F80, _MLX_BFloat16::bits_to_bfloat())
+typedef matrix<bfloat16_t, 4, 1> bfloat4;
 
 #endif
 
