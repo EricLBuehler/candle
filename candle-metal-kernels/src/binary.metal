@@ -332,7 +332,7 @@ BINARY(FN, int64_t, uint8_t, NAME##_i64, NAME##_i64_strided);
 BINARY(FN, bfloat16_t, bfloat16_t, NAME##_bf16, NAME##_bf16_strided);
 
 #define BFLOAT_BINARY_OP_OUT(NAME, FN) \
-BINARY(FN, bfloat, uint8_t, NAME##_bf16, NAME##_bf16_strided);
+BINARY(FN, bfloat16_t, uint8_t, NAME##_bf16, NAME##_bf16_strided);
 
 BINARY_OP(x + y, add)
 BINARY_OP(x - y, sub)
