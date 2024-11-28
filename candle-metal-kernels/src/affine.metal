@@ -594,7 +594,7 @@ kernel void FN_NAME( \
         return; \
     } \
     const TYPENAME x = input[id]; \
-    output[id] = TYPENAME((x > 0)?x: mul * (exp(x) - 1)); \
+    output[id] = TYPENAME((x > 0)?x: static_cast<TYPENAME>(mul) * (exp(x) - 1)); \
 } \
 kernel void FN_NAME##_strided( \
     constant size_t &dim, \
@@ -610,7 +610,7 @@ kernel void FN_NAME##_strided( \
         return; \
     } \
     const TYPENAME x = input[get_strided_index(id, num_dims, dims, strides)]; \
-    output[id] = TYPENAME((x > 0)?x: mul * (exp(x) - 1)); \
+    output[id] = TYPENAME((x > 0)?x: static_cast<TYPENAME>(mul) * (exp(x) - 1)); \
 } \
 
 
