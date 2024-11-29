@@ -31,7 +31,12 @@ pub trait GgmlType: Sized + Clone + Send + Sync {
     }
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()>;
     fn from_float(xs: &[f32], ys: &mut [Self]) -> Result<()>;
-    fn from_float_imatrix(_xs: &[f32], _ys: &mut [Self], _imatrix_weights: &[f32]) -> Result<()> {
+    fn from_float_imatrix(
+        _xs: &[f32],
+        _ys: &mut [Self],
+        _imatrix_weights: &[f32],
+        _n_per_row: usize,
+    ) -> Result<()> {
         crate::bail!(
             "`from_float_imatrix` is unimplemented for {:?}",
             Self::DTYPE
@@ -1317,7 +1322,12 @@ impl GgmlType for BlockQ4K {
         Ok(())
     }
 
-    fn from_float_imatrix(xs: &[f32], ys: &mut [Self], imatrix_weights: &[f32]) -> Result<()> {
+    fn from_float_imatrix(
+        xs: &[f32],
+        ys: &mut [Self],
+        imatrix_weights: &[f32],
+        n_per_row: usize,
+    ) -> Result<()> {
         for (sblk_idx, (block, x)) in group_for_quantization(xs, ys)?.into_iter().enumerate() {
             let mut mins: [f32; QK_K / 32] = [0.0; QK_K / 32];
             let mut scales: [f32; QK_K / 32] = [0.0; QK_K / 32];
@@ -1332,7 +1342,7 @@ impl GgmlType for BlockQ4K {
 
             for (j, x_scale_slice) in x.chunks_exact(32).enumerate() {
                 for (l, (w_elem, x_elem)) in weights.iter_mut().zip(x_scale_slice).enumerate() {
-                    let imatrix_row = sblk_idx % QK_K;
+                    let imatrix_row = sblk_idx % (n_per_row / QK_K);
                     let imatrix_w = imatrix_weights[imatrix_row * QK_K + 32 * j + l];
                     *w_elem = imatrix_w * (sigma2 + x_elem * x_elem).sqrt();
                 }

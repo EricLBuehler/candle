@@ -106,13 +106,22 @@ impl QStorage {
         Ok(())
     }
 
-    fn quantize_imatrix(&mut self, src: &Storage, imatrix_weights: &[f32]) -> Result<()> {
+    fn quantize_imatrix(
+        &mut self,
+        src: &Storage,
+        imatrix_weights: &[f32],
+        n_per_row: usize,
+    ) -> Result<()> {
         match (self, src) {
             (QStorage::Cpu(storage), Storage::Cpu(src)) => {
-                storage.from_float_imatrix(src.as_slice::<f32>()?, imatrix_weights)?;
+                storage.from_float_imatrix(src.as_slice::<f32>()?, imatrix_weights, n_per_row)?;
             }
-            (QStorage::Metal(storage), Storage::Metal(src)) => todo!(),
-            (QStorage::Cuda(storage), Storage::Cuda(src)) => todo!(),
+            (QStorage::Metal(storage), Storage::Metal(src)) => {
+                storage.quantize_imatrix(src, imatrix_weights, n_per_row)?
+            }
+            (QStorage::Cuda(storage), Storage::Cuda(src)) => {
+                storage.quantize_imatrix(src, imatrix_weights, n_per_row)?
+            }
             _ => crate::bail!("Invalid quantize storage locations do not match"),
         }
         Ok(())
@@ -285,7 +294,12 @@ pub trait QuantizedType: Send + Sync {
     #[allow(clippy::wrong_self_convention)]
     fn from_float(&mut self, xs: &[f32]) -> Result<()>;
     #[allow(clippy::wrong_self_convention)]
-    fn from_float_imatrix(&mut self, xs: &[f32], imatrix_weights: &[f32]) -> Result<()>;
+    fn from_float_imatrix(
+        &mut self,
+        xs: &[f32],
+        imatrix_weights: &[f32],
+        n_per_row: usize,
+    ) -> Result<()>;
     fn size(&self) -> usize;
 }
 
@@ -302,8 +316,13 @@ impl<T: k_quants::GgmlType + Send + Sync> QuantizedType for Vec<T> {
         T::from_float(xs, self)
     }
 
-    fn from_float_imatrix(&mut self, xs: &[f32], imatrix_weights: &[f32]) -> Result<()> {
-        T::from_float_imatrix(xs, self, imatrix_weights)
+    fn from_float_imatrix(
+        &mut self,
+        xs: &[f32],
+        imatrix_weights: &[f32],
+        n_per_row: usize,
+    ) -> Result<()> {
+        T::from_float_imatrix(xs, self, imatrix_weights, n_per_row)
     }
 
     fn dtype(&self) -> GgmlDType {
@@ -383,6 +402,14 @@ impl QTensor {
     ) -> Result<Self> {
         // (n_per_row/QK_K-1)*QK_K+(QK_K/32-1)*32+32=n_per_row
         // Size of imatrix == last dim of tensor
+        let n_per_row = src.dim(D::Minus1)?;
+        if imatrix_weights.len() != n_per_row {
+            crate::bail!(
+                "imatrix weights must have the same length {} as the last dim of src {}",
+                imatrix_weights.len(),
+                src.dim(D::Minus1)?
+            );
+        }
 
         let shape = src.shape();
         let block_size = dtype.block_size();
@@ -395,15 +422,8 @@ impl QTensor {
                 block_size
             );
         }
-        if imatrix_weights.len() != src.dim(D::Minus1)? {
-            crate::bail!(
-                "imatrix weights must have the same length {} as the last dim of src {}",
-                imatrix_weights.len(),
-                src.dim(D::Minus1)?
-            );
-        }
         let mut storage = src.device().qzeros(elem_count, dtype)?;
-        storage.quantize_imatrix(&src.storage(), imatrix_weights)?;
+        storage.quantize_imatrix(&src.storage(), imatrix_weights, n_per_row)?;
         Ok(Self {
             storage,
             shape: shape.clone(),

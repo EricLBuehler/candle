@@ -130,6 +130,23 @@ impl QMetalStorage {
         Ok(())
     }
 
+    pub fn quantize_imatrix(
+        &mut self,
+        src: &MetalStorage,
+        imatrix_weights: &[f32],
+        n_per_row: usize,
+    ) -> Result<()> {
+        // Quantization only happens on CPU for now.
+        let src = src.to_cpu::<f32>()?;
+        let elem_count = src.len();
+        let src = crate::Storage::Cpu(crate::CpuStorage::F32(src));
+        let mut qcpu_storage = crate::Device::Cpu.qzeros(elem_count, self.dtype)?;
+        qcpu_storage.quantize_imatrix(&src, imatrix_weights, n_per_row)?;
+        let buffer = self.device.new_buffer_with_data(&qcpu_storage.data()?)?;
+        self.buffer = buffer;
+        Ok(())
+    }
+
     pub fn quantize_onto(&mut self, src: &crate::CpuStorage) -> Result<()> {
         // Quantization only happens on CPU for now.
         let elem_count = src.as_slice::<f32>()?.len();
