@@ -402,7 +402,7 @@ pub(super) fn make_qkx3_quants(
     let mut best_mad = 0.0;
 
     for i in 0..n {
-        let l_val = (nearest_int(iscale * (x[i] - min_val)) as i32).clamp(0, nmax as i32) as u8;
+        let l_val = nearest_int(iscale * (x[i] - min_val)).clamp(0, nmax) as u8;
         l[i] = l_val;
         let diff = scale * (l_val as f32) + min_val - x[i];
         let diff = if use_mad { diff.abs() } else { diff * diff };
@@ -422,7 +422,7 @@ pub(super) fn make_qkx3_quants(
         let (mut sum_l, mut sum_l2, mut sum_xl) = (0.0, 0.0, 0.0);
 
         for i in 0..n {
-            let l_val = (nearest_int(iscale * (x[i] - min_val)) as i32).clamp(0, nmax as i32) as u8;
+            let l_val = nearest_int(iscale * (x[i] - min_val)).clamp(0, nmax) as u8;
             l_aux[i] = l_val;
             let w = match weights {
                 Some(w) => w[i],
