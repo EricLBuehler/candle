@@ -75,7 +75,6 @@ pub fn load_imatrix<P: AsRef<Path>>(fname: P) -> Result<HashMap<String, Vec<f32>
             if ncall == 0 {
                 data.push(v);
             } else {
-                data.push(v);
                 data.push(v / ncall as f32);
             }
         }
