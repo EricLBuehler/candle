@@ -488,7 +488,7 @@ impl QCudaStorage {
         let src_len = src.len();
         let src = crate::Storage::Cpu(crate::CpuStorage::F32(src));
         let mut qcpu_storage = crate::Device::Cpu.qzeros(src_len, self.dtype)?;
-        qcpu_storage.quantize_imatrix(&src, imatrix, n_per_row)?;
+        qcpu_storage.quantize_imatrix(&src, imatrix_weights, n_per_row)?;
         let data = qcpu_storage.data()?;
         let padded_len =
             data.len() + MATRIX_ROW_PADDING * self.dtype.type_size() / self.dtype.block_size();
