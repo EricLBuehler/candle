@@ -1169,6 +1169,111 @@ impl GgmlType for BlockQ3K {
         Ok(())
     }
 
+    fn from_float_imatrix(
+        xs: &[f32],
+        ys: &mut [Self],
+        imatrix_weights: &[f32],
+        n_per_row: usize,
+    ) -> Result<()> {
+        for (sblk_idx, (block, x)) in group_for_quantization(xs, ys)?.into_iter().enumerate() {
+            let mut scales: [f32; QK_K / 16] = [0.0; QK_K / 16];
+            let mut weights: [f32; 16] = [0.0; 16];
+            let mut sw: [f32; QK_K / 16] = [0.0; QK_K / 16];
+            let mut ls: [i8; QK_K / 16] = [0; QK_K / 16];
+            let mut l: [i8; QK_K] = [0; QK_K];
+
+            let sum_x2 = x.iter().map(|x| x * x).sum::<f32>();
+            let sigma2 = 2. * sum_x2 / QK_K as f32;
+            // let av_x = sigma2.sqrt();
+
+            for (j, x_scale_slice) in x.chunks_exact(16).enumerate() {
+                for (l, (w_elem, x_elem)) in weights.iter_mut().zip(x_scale_slice).enumerate() {
+                    let imatrix_row = sblk_idx % (n_per_row / QK_K);
+                    let imatrix_w = imatrix_weights[imatrix_row * QK_K + 16 * j + l];
+                    *w_elem = imatrix_w * (sigma2 + x_elem * x_elem).sqrt();
+                }
+                let sumw = weights.iter().sum::<f32>();
+                sw[j] = sumw;
+                scales[j] = unsafe {
+                    make_qx_quants(
+                        16,
+                        4,
+                        x_scale_slice.as_ptr(),
+                        l.as_mut_ptr().add(16 * j),
+                        1,
+                        weights.as_ptr(),
+                    )
+                };
+            }
+
+            block.scales.fill(0);
+            let d_block = unsafe {
+                make_qx_quants(
+                    QK_K / 16,
+                    32,
+                    scales.as_ptr(),
+                    ls.as_mut_ptr(),
+                    1,
+                    sw.as_ptr(),
+                )
+            };
+            block.d = f16::from_f32(d_block);
+            for j in 0..QK_K / 16 {
+                let l = ls[j];
+                if j < 8 {
+                    block.scales[j] = (l & 0xF) as u8;
+                } else {
+                    block.scales[j - 8] = ((l & 0xF) << 4) as u8;
+                }
+                let l = l >> 4;
+                block.scales[j % 4 + 8] |= (l << (2 * (j / 4))) as u8;
+            }
+
+            for j in 0..QK_K / 16 {
+                let sc = if j < 8 {
+                    block.scales[j] & 0xF
+                } else {
+                    block.scales[j - 8] >> 4
+                };
+                let sc = (sc | (((block.scales[8 + j % 4] >> (2 * (j / 4))) & 3) << 4)) as i8 - 32;
+                let d = block.d.to_f32() * sc as f32;
+                if d != 0.0 {
+                    for ii in 0..16 {
+                        let l_val = nearest_int(x[16 * j + ii] / d);
+                        l[16 * j + ii] = (l_val.clamp(-4, 3) + 4) as i8;
+                    }
+                }
+            }
+
+            block.hmask.fill(0);
+            let mut m = 0;
+            let mut hm = 1;
+
+            for ll in l.iter_mut() {
+                if *ll > 3 {
+                    block.hmask[m] |= hm;
+                    *ll -= 4;
+                }
+                m += 1;
+                if m == QK_K / 8 {
+                    m = 0;
+                    hm <<= 1;
+                }
+            }
+
+            for j in (0..QK_K).step_by(128) {
+                for l_val in 0..32 {
+                    block.qs[j / 4 + l_val] = (l[j + l_val]
+                        | (l[j + l_val + 32] << 2)
+                        | (l[j + l_val + 64] << 4)
+                        | (l[j + l_val + 96] << 6))
+                        as u8;
+                }
+            }
+        }
+        Ok(())
+    }
+
     // https://github.com/ggerganov/llama.cpp/blob/8183159cf3def112f6d1fe94815fce70e1bffa12/k_quants.c#L533
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
         const KMASK1: u32 = 0x03030303;
@@ -1809,7 +1914,8 @@ impl GgmlType for BlockQ6K {
                 let mut max_scale = 0f32;
                 let mut max_abs_scale = 0f32;
                 for (ib, scale_) in scales.iter_mut().enumerate() {
-                    let scale = make_qx_quants(16, 32, x.add(16 * ib), l.add(16 * ib), 1);
+                    let scale =
+                        make_qx_quants(16, 32, x.add(16 * ib), l.add(16 * ib), 1, std::ptr::null());
                     *scale_ = scale;
                     let abs_scale = scale.abs();
                     if abs_scale > max_abs_scale {

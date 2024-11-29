@@ -64,6 +64,7 @@ pub(super) unsafe fn make_qx_quants(
     x: *const f32,
     ls: *mut i8,
     rmse_type: i32,
+    qw: *const f32,
 ) -> f32 {
     let mut max = 0f32;
     let mut amax = 0f32;
@@ -99,7 +100,13 @@ pub(super) unsafe fn make_qx_quants(
         let l = nearest_int(iscale * x);
         let l = l.clamp(-nmax, nmax - 1);
         *ls.add(i) = (l + nmax) as i8;
-        let w = if weight_type == 1 { x * x } else { 1.0 };
+        let w = if !qw.is_null() {
+            *qw.add(i)
+        } else if weight_type == 1 {
+            x * x
+        } else {
+            1.0
+        };
         let l = l as f32;
         sumlx += w * x * l;
         suml2 += w * l * l;
@@ -118,7 +125,13 @@ pub(super) unsafe fn make_qx_quants(
             if l + nmax != *ls.add(i) as i32 {
                 changed = true;
             }
-            let w = if weight_type == 1 { x * x } else { 1f32 };
+            let w = if !qw.is_null() {
+                *qw.add(i)
+            } else if weight_type == 1 {
+                x * x
+            } else {
+                1.0
+            };
             let l = l as f32;
             slx += w * x * l;
             sl2 += w * l * l;
@@ -140,7 +153,13 @@ pub(super) unsafe fn make_qx_quants(
         let mut n_changed = 0;
         for i in 0..n {
             let x = *x.add(i);
-            let w = if weight_type == 1 { x * x } else { 1. };
+            let w = if !qw.is_null() {
+                *qw.add(i)
+            } else if weight_type == 1 {
+                x * x
+            } else {
+                1.0
+            };
             let l = *ls.add(i) as i32 - nmax;
             let mut slx = sumlx - w * x * l as f32;
             if slx > 0. {
@@ -179,7 +198,13 @@ pub(super) unsafe fn make_qx_quants(
             let x = *x.add(i);
             let l = nearest_int(iscale * x);
             let l = l.clamp(-nmax, nmax - 1);
-            let w = if weight_type == 1 { x * x } else { 1. };
+            let w = if !qw.is_null() {
+                *qw.add(i)
+            } else if weight_type == 1 {
+                x * x
+            } else {
+                1.0
+            };
             let l = l as f32;
             sumlx += w * x * l;
             suml2 += w * l * l;
