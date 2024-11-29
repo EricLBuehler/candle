@@ -3,7 +3,7 @@ use candle_core::{
     quantized::{self, GgmlDType},
     test_device,
     test_utils::to_vec2_round,
-    DType, Device, IndexOp, Module, Result, Tensor, D,
+    DType, Device, IndexOp, Module, Result, Tensor, Var, D,
 };
 use quantized::{k_quants, GgmlType};
 use rand::prelude::*;
@@ -629,6 +629,26 @@ fn imatrix_quantize_q4k() -> Result<()> {
     let dst2 = dequant2.to_vec1::<f32>()?;
     compare_with_error(dst1.as_slice(), src.as_slice(), 0.017);
     compare_with_error(dst2.as_slice(), src.as_slice(), 0.017);
+
+    let mut row_counts = 0f64;
+    let mut ncall = 0f64;
+    let mut values = Tensor::zeros((7,), DType::F32, cpu)?;
+
+    for _ in 0..1000 {
+        let lhs = Var::from_tensor(&Tensor::randn(0f32, 1f32, (6, 5), cpu)?)?;
+        let rhs = Var::from_tensor(&Tensor::randn(0f32, 1f32, (5, 7), cpu)?)?;
+        let res = lhs.matmul(&rhs)?;
+
+        // https://github.com/ggerganov/llama.cpp/blob/678d7994f4da0af3d29046be99950ac999ee9762/examples/imatrix/imatrix.cpp#L180-L186
+        values = (values + res.sum(0)?)?;
+        row_counts += res.dim(0)? as f64;
+        ncall += 1.;
+    }
+
+    dbg!(&row_counts, &ncall);
+    // https://github.com/ggerganov/llama.cpp/blob/678d7994f4da0af3d29046be99950ac999ee9762/examples/imatrix/imatrix.cpp#L275
+    let out = ((values / row_counts)? * ncall)?;
+    println!("{out}");
 
     Ok(())
 }
