@@ -656,6 +656,44 @@ fn imatrix_quantize_q4k() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn imatrix_quantize_q2k() -> Result<()> {
+    let cpu = &Device::Cpu;
+
+    let mut row_counts = 0f64;
+    let mut ncall = 0f64;
+    let mut values = Tensor::zeros((768,), DType::F32, cpu)?;
+
+    for _ in 0..10 {
+        let lhs = Var::from_tensor(&Tensor::randn(0f32, 1f32, (1024, 512), cpu)?)?;
+        let rhs = Var::from_tensor(&Tensor::randn(0f32, 1f32, (512, 768), cpu)?)?;
+        let res = lhs.matmul(&rhs)?;
+
+        // https://github.com/ggerganov/llama.cpp/blob/678d7994f4da0af3d29046be99950ac999ee9762/examples/imatrix/imatrix.cpp#L180-L186
+        values = (values + res.sqr()?.sum(0)?)?;
+        row_counts += res.dim(0)? as f64;
+        ncall += 1.;
+    }
+
+    // https://github.com/ggerganov/llama.cpp/blob/678d7994f4da0af3d29046be99950ac999ee9762/examples/imatrix/imatrix.cpp#L275
+    let out = ((values / row_counts)? * ncall)?;
+    let imatrix = out.to_vec1::<f32>()?;
+
+    let xs = Tensor::randn(0f32, 1f32, (1024, 768), cpu)?;
+
+    let quant1 = quantized::QTensor::quantize(&xs, GgmlDType::Q2K)?;
+    let quant2 = quantized::QTensor::quantize_imatrix(&xs, &imatrix, GgmlDType::Q2K)?;
+
+    let dequant1 = quant1.dequantize(cpu)?;
+    let dequant2 = quant2.dequantize(cpu)?;
+
+    let err1 = (dequant1 - &xs)?.abs()?.mean_all()?.to_scalar::<f32>()?;
+    let err2 = (dequant2 - &xs)?.abs()?.mean_all()?.to_scalar::<f32>()?;
+    assert!(err2 < err1);
+
+    Ok(())
+}
+
 fn quantize_q5k(device: &Device) -> Result<()> {
     let dtype = GgmlDType::Q5K;
     let src = get_test_vector2(0.5, 1024, device)?;
