@@ -613,6 +613,13 @@ fn quantize_q4k(device: &Device) -> Result<()> {
 
 #[test]
 fn imatrix_quantize_q4k() -> Result<()> {
+    // let data =
+    //     quantized::imatrix_file::load_imatrix("../llama-8b-v3-instruct-f16.imatrix").unwrap();
+    // for (name, weights) in &data {
+    //     println!("{name}, {} elems", weights.len());
+    // }
+    // dbg!(&data["blk.0.attn_q.weight"][0..32]);
+
     let cpu = &Device::Cpu;
 
     let mut row_counts = 0f64;
