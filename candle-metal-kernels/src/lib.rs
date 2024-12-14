@@ -3114,7 +3114,7 @@ pub fn call_mlx_addmm(
         fdc: i32,
         batch_stride_c: isize,
         alpha: f32,
-        beta: f32
+        beta: f32,
     }
 
     assert!(rhs_stride.len() >= 2);
@@ -3202,7 +3202,11 @@ pub fn call_mlx_addmm(
         alpha,
         beta,
     };
-    let batch_strides = [gemm_params.batch_stride_a, gemm_params.batch_stride_b, gemm_addmm_params.batch_stride_c];
+    let batch_strides = [
+        gemm_params.batch_stride_a,
+        gemm_params.batch_stride_b,
+        gemm_addmm_params.batch_stride_c,
+    ];
 
     // TODO(laurent): generate the name
     // template [[host_name("gemm_" #tname "_"  #iname "_" #oname "_bm" #bm "_bn" #bn "_bk" #bk "_wm" #wm "_wn" #wn)]]

@@ -1593,7 +1593,9 @@ impl BackendStorage for MetalStorage {
         lhs_l: &Layout,
         rhs_l: &Layout,
     ) -> Result<Self> {
-        let buffer = self.device.new_buffer(b * m * n, self.dtype, "matmul_with_alpha")?;
+        let buffer = self
+            .device
+            .new_buffer(b * m * n, self.dtype, "matmul_with_alpha")?;
         let command_buffer = self.device.command_buffer()?;
         command_buffer.set_label("matmul_with_alpha");
         if self.dtype == DType::BF16 {
