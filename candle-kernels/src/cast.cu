@@ -177,6 +177,12 @@ CAST_OP_FP8_INTO(__nv_bfloat16, __nv_fp8_e4m3, cast_bf16_f8_e4m3)
 #endif
 
 #if __CUDA_ARCH__ >= 530
+#include "cuda_bf16.h"
+CAST_THROUGH_OP(__nv_bfloat16, __half, float, cast_bf16_f16)
+CAST_OP(__nv_bfloat16, float,    cast_bf16_f32)
+CAST_OP(float, __nv_bfloat16, cast_f16_bf16)
+CAST_OP(float, __nv_bfloat16, cast_f32_bf16)
+
 CAST_OP(__half, __half, cast_f16_f16)
 
 CAST_THROUGH_OP(__half, uint8_t,  float, cast_f16_u8)

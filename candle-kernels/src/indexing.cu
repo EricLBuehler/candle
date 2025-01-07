@@ -268,6 +268,8 @@ SA_OP_F8(__nv_fp8_e4m3, uint8_t, sa_u8_f8_e4m3)
 #endif
 
 #if __CUDA_ARCH__ >= 530
+#include "cuda_bf16.h"
+IS_OP(__nv_bfloat16, uint32_t, is_u32_bf16)
 IS_OP(__half, int16_t, is_i16_f16)
 IS_OP(__half, int32_t, is_i32_f16)
 IS_OP(__half, int64_t, is_i64_f16)

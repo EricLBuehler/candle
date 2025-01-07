@@ -50,6 +50,8 @@ WHERE_OP(__nv_fp8_e4m3, uint8_t, where_u8_fp8_e4m3)
 #endif
 
 #if __CUDA_ARCH__ >= 530
+#include "cuda_bf16.h"
+WHERE_OP(__nv_bfloat16, uint8_t, where_u8_bf16)
 WHERE_OP(__half, int16_t, where_i16_f16)    
 WHERE_OP(__half, int32_t, where_i32_f16)
 WHERE_OP(__half, int64_t, where_i64_f16)
