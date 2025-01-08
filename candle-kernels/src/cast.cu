@@ -24,7 +24,6 @@ __device__ void cast_(
     }
 }
 
-#if __CUDA_ARCH__ >= 800
 #define F8E4M3_TO_FLOAT(x) __half2float(__nv_cvt_fp8_to_halfraw(x.__x, __NV_E4M3))
 
 template <typename T>
@@ -71,7 +70,6 @@ __device__ void cast_fp8_into_(
         }
     }
 }
-#endif
 
 template <typename S, typename T, typename I>
 __device__ void cast_through(
@@ -143,9 +141,9 @@ extern "C" __global__ void FN_NAME( \
     cast_through<SRC_TYPENAME, DST_TYPENAME, INT_TYPENAME>(numel, num_dims, info, inp, out); \
 } \
 
-#if __CUDA_ARCH__ >= 800
 #include "cuda_fp8.h"
 #include "cuda_bf16.h"
+
 CAST_OP(__nv_bfloat16, __nv_bfloat16, cast_bf16_bf16)
 CAST_OP(__nv_fp8_e4m3, __nv_fp8_e4m3, cast_f8_e4m3_f8_e4m3)
 
@@ -174,16 +172,6 @@ CAST_OP_FP8_INTO(int32_t,   __nv_fp8_e4m3, cast_i32_f8_e4m3)
 CAST_OP_FP8(__nv_fp8_e4m3, int32_t, cast_f8_e4m3_i32)
 CAST_OP_FP8(__nv_fp8_e4m3, __nv_bfloat16, cast_f8_e4m3_bf16)
 CAST_OP_FP8_INTO(__nv_bfloat16, __nv_fp8_e4m3, cast_bf16_f8_e4m3)
-#endif
-
-#if __CUDA_ARCH__ >= 530
-#if __CUDA_ARCH__ < 800
-#include "cuda_bf16.h"
-CAST_THROUGH_OP(__nv_bfloat16, __half, float, cast_bf16_f16)
-CAST_OP(__nv_bfloat16, float,    cast_bf16_f32)
-CAST_OP(float, __nv_bfloat16, cast_f16_bf16)
-CAST_OP(float, __nv_bfloat16, cast_f32_bf16)
-#endif
 
 CAST_OP(__half, __half, cast_f16_f16)
 
@@ -197,7 +185,6 @@ CAST_OP(float,    __half, cast_f32_f16)
 CAST_OP(double,   __half, cast_f64_f16)
 CAST_OP(int32_t,  __half, cast_i32_f16 )
 CAST_THROUGH_OP(__half, int32_t,  float, cast_f16_i32)
-#endif
 
 CAST_OP(uint32_t, uint32_t, cast_u32_u32)
 CAST_OP(uint32_t, uint8_t,  cast_u32_u8 )

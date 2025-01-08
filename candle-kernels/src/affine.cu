@@ -28,7 +28,6 @@ extern "C" __global__ void FN_NAME(  \
     } \
 } \
 
-#if __CUDA_ARCH__ >= 800
 #include "cuda_fp8.h"
 #include "cuda_bf16.h"
 
@@ -37,11 +36,8 @@ AFFINE_OP(__nv_bfloat16, affine_bf16, x * mul + add)
 #define F8E4M3_TO_FLOAT(x) __half2float(__nv_cvt_fp8_to_halfraw(x.__x, __NV_E4M3))
 
 AFFINE_OP(__nv_fp8_e4m3, affine_f8_e4m3, __nv_fp8_e4m3(F8E4M3_TO_FLOAT(x) * F8E4M3_TO_FLOAT(mul) + F8E4M3_TO_FLOAT(add)))
-#endif
 
-#if __CUDA_ARCH__ >= 530
 AFFINE_OP(__half, affine_f16, x * mul + add)
-#endif
 
 AFFINE_OP(float, affine_f32, x * mul + add)
 AFFINE_OP(double, affine_f64, x * mul + add)

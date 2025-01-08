@@ -76,7 +76,5 @@ extern "C" __global__ void FN_NAME(\
 RMS_NORM_OP(rms_norm_f32, float)
 RMS_NORM_OP(rms_norm_f16, __half)
 
-#if __CUDA_ARCH__ >= 800
 #include <cuda_bf16.h>
 RMS_NORM_OP(rms_norm_bf16, __nv_bfloat16)
-#endif

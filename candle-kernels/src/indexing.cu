@@ -99,7 +99,6 @@ __device__ void index_add(
       }
 }
 
-#if __CUDA_ARCH__ >= 800
 #define F8E4M3_TO_FLOAT(x) __half2float(__nv_cvt_fp8_to_halfraw(x.__x, __NV_E4M3))
 
 template<typename I>
@@ -148,7 +147,6 @@ __device__ void index_add_f8(
           }
       }
 }
-#endif
 
 #define IA_OP(TYPENAME, INDEX_TYPENAME, FN_NAME) \
 extern "C" __global__ void FN_NAME(  \
@@ -220,7 +218,6 @@ extern "C" __global__ void FN_NAME(  \
 ) { scatter_add_f8(ids, inp, out, left_size, src_dim_size, dst_dim_size, right_size); } \
 
 
-#if __CUDA_ARCH__ >= 800
 #include "cuda_fp8.h"
 #include "cuda_bf16.h"
 
@@ -265,13 +262,7 @@ SA_OP_F8(__nv_fp8_e4m3, int32_t, sa_i32_f8_e4m3)
 SA_OP_F8(__nv_fp8_e4m3, int64_t, sa_i64_f8_e4m3)
 SA_OP_F8(__nv_fp8_e4m3, uint32_t, sa_u32_f8_e4m3)
 SA_OP_F8(__nv_fp8_e4m3, uint8_t, sa_u8_f8_e4m3)
-#endif
 
-#if __CUDA_ARCH__ >= 530
-#if __CUDA_ARCH__ < 800
-#include "cuda_bf16.h"
-IS_OP(__nv_bfloat16, uint32_t, is_u32_bf16)
-#endif
 IS_OP(__half, int16_t, is_i16_f16)
 IS_OP(__half, int32_t, is_i32_f16)
 IS_OP(__half, int64_t, is_i64_f16)
@@ -292,7 +283,6 @@ SA_OP(__half, int32_t, sa_i32_f16)
 SA_OP(__half, int64_t, sa_i64_f16)
 SA_OP(__half, uint32_t, sa_u32_f16)
 SA_OP(__half, uint8_t, sa_u8_f16)
-#endif
 
 IS_OP(float, int16_t, is_i16_f32)
 IS_OP(double, int16_t, is_i16_f64)

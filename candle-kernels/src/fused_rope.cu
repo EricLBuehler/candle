@@ -189,7 +189,6 @@ extern "C" __global__ void rotary_embedding_kernel_neox_f64(
   apply_rotary_embedding<double, true>(query, key, cache_ptr, head_size, num_heads, num_kv_heads, rot_dim, token_idx, query_stride, key_stride);
 }
 
-#if __CUDA_ARCH__ >= 530
 #include <cuda_bf16.h>
 extern "C" __global__ void rotary_embedding_kernel_bf16(
   const int64_t* __restrict__ positions,        // [batch_size, seq_len] or [num_tokens]
@@ -228,5 +227,4 @@ extern "C" __global__ void rotary_embedding_kernel_neox_bf16(
 
   apply_rotary_embedding<__nv_bfloat16, true>(query, key, cache_ptr, head_size, num_heads, num_kv_heads, rot_dim, token_idx, query_stride, key_stride);
 }
-#endif
 

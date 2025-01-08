@@ -571,7 +571,6 @@ fast_argmax(const size_t src_numel, const size_t el_to_sum_per_block,
     rope_thd<TYPENAME>(src, cos, sin, dst, b, t, h, d); \
   } \
 
-#if __CUDA_ARCH__ >= 800
 #include "cuda_bf16.h"
 SOFTMAX_OP(__nv_bfloat16, float, softmax_bf16)
 RMSNORM_OP(__nv_bfloat16, rmsnorm_bf16)
@@ -587,22 +586,13 @@ FAST_OP(__nv_bfloat16, fast_min_bf16, fast_max_bf16, fast_argmin_bf16, fast_argm
 // LAYERNORM_OP(__nv_fp8_e4m3, layernorm_fp8_e4m3)
 // ROPE_OP(__nv_fp8_e4m3, rope_fp8_e4m3, rope_i_fp8_e4m3, rope_thd_fp8_e4m3)
 // FAST_OP(__nv_fp8_e4m3, fast_min_fp8_e4m3, fast_max_fp8_e4m3, fast_argmin_fp8_e4m3, fast_argmax_fp8_e4m3, fast_sum_fp8_e4m3)
-#endif
 
-#if __CUDA_ARCH__ >= 530
-#if __CUDA_ARCH__ < 800
-#include "cuda_bf16.h"
-ROPE_OP(__nv_bfloat16, rope_bf16, rope_i_bf16, rope_thd_bf16)
-SOFTMAX_OP(__nv_bfloat16, float, softmax_bf16)
-RMSNORM_OP(__nv_bfloat16, rmsnorm_bf16)
-#endif
 SOFTMAX_OP(__half, float, softmax_f16)
 RMSNORM_OP(__half, rmsnorm_f16)
 LAYERNORM_OP(__half, layernorm_f16)
 ROPE_OP(__half, rope_f16, rope_i_f16, rope_thd_f16)
 SUM_OP(__half, sum_f16)
 FAST_OP(__half, fast_min_f16, fast_max_f16, fast_argmin_f16, fast_argmax_f16, fast_sum_f16)
-#endif
 
 SUM_OP(float, sum_f32)
 SUM_OP(double, sum_f64)

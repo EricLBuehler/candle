@@ -73,17 +73,13 @@ extern "C" __global__ void asort_desc_##RUST_NAME(  \
     k_argsort<SORT_ORDER_DESC>(x, dst, ncols, ncols_pad); \
 } \
  
-#if __CUDA_ARCH__ >= 800
 #include "cuda_bf16.h"
 ASORT_OP(__nv_bfloat16, bf16)
 
 // NOTE: No sort ops for f8
 // ASORT_OP(__nv_fp8_e4m3, fp8_e4m3)
-#endif
 
-#if __CUDA_ARCH__ >= 530
 ASORT_OP(__half, f16)
-#endif
 
 ASORT_OP(float, f32)
 ASORT_OP(double, f64)

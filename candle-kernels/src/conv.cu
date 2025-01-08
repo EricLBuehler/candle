@@ -691,7 +691,6 @@ extern "C" __global__ void FN_NAME(  \
   upsample_nearest2d<TYPENAME>(w_out, h_out, w_scale, h_scale, info, src, dst); \
 } \
 
-#if __CUDA_ARCH__ >= 800
 #include "cuda_bf16.h"
 
 CONV1D_OP(__nv_bfloat16, float, conv1d_bf16)
@@ -716,9 +715,7 @@ COL2IM1D_OP(__nv_bfloat16, col2im1d_bf16)
 // IM2COL_OP(__nv_fp8_e4m3, im2col_f8_e5m)
 // IM2COL1D_OP(__nv_fp8_e4m3, im2col1d_f8_e5m)
 // COL2IM1D_OP(__nv_fp8_e4m3, col2im1d_f8_e5m)
-#endif
 
-#if __CUDA_ARCH__ >= 530
 CONV1D_OP(__half, float, conv1d_f16)
 CONV2D_OP(__half, float, conv2d_f16)
 CONVT1D_OP(__half, float, conv_transpose1d_f16)
@@ -729,7 +726,6 @@ UPSAMPLE_NEAREST2D_OP(__half, upsample_nearest2d_f16)
 IM2COL_OP(__half, im2col_f16)
 IM2COL1D_OP(__half, im2col1d_f16)
 COL2IM1D_OP(__half, col2im1d_f16)
-#endif
 
 CONV1D_OP(float, float, conv1d_f32)
 CONV1D_OP(double, double, conv1d_f64)

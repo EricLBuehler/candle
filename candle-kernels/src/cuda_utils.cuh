@@ -2,6 +2,9 @@
 #include<stdint.h>
 #include<cmath>
 
+#include "cuda_fp8.h"
+#include "cuda_bf16.h"
+
 // TODO: This is often used to check that the data is contiguous so that
 // kernels can be easily mapped. However this only returns true for row
 // major, if all the inputs are column major, we could apply the fast path
@@ -191,11 +194,6 @@ __device__ __forceinline__ uint32_t ming(uint32_t a, uint32_t b) { return min(a,
 __device__ __forceinline__ uint32_t maxg(uint32_t a, uint32_t b) { return max(a, b); }
 __device__ __forceinline__ uint8_t ming(uint8_t a, uint8_t b) { return min(a, b); }
 __device__ __forceinline__ uint8_t maxg(uint8_t a, uint8_t b) { return max(a, b); }
-#if __CUDA_ARCH__ >= 530
-#if __CUDA_ARCH__ < 800
-#include "cuda_bf16.h"
-__device__ __forceinline__ __nv_bfloat16 maxg(__nv_bfloat16 a, __nv_bfloat16 b) { return __hmax_nan(a, b); }
-#endif
 __device__ __forceinline__ __half powg(__half a, __half b) { return __float2half(powf(__half2float(a), __half2float(b))); }
 __device__ __forceinline__ bool isnang(__half a) { return __hisnan(a); }
 __device__ __forceinline__ __half sqrtg(__half a) { return hsqrt(a); }
@@ -214,11 +212,6 @@ __device__ __forceinline__ __half logg(__half a) { return hlog(a); }
 __device__ __forceinline__ __half expg(__half a) { return hexp(a); }
 __device__ __forceinline__ __half absg(__half a) { return __habs(a); }
 __device__ __forceinline__ __half copysigng(__half a, __half b) { return __float2half(copysignf(__half2float(a), __half2float(b))); }
-#endif
-
-#if __CUDA_ARCH__ >= 800
-#include "cuda_fp8.h"
-#include "cuda_bf16.h"
 
 __device__ __forceinline__ __nv_bfloat16 powg(__nv_bfloat16 a, __nv_bfloat16 b) { return __float2bfloat16(powf(__bfloat162float(a), __bfloat162float(b))); }
 __device__ __forceinline__ bool isnang(__nv_bfloat16 a) { return __hisnan(a); }
@@ -260,5 +253,3 @@ __device__ __forceinline__ __nv_fp8_e4m3 expg(__nv_fp8_e4m3 a) { return __nv_fp8
 __device__ __forceinline__ __nv_fp8_e4m3 absg(__nv_fp8_e4m3 a) { return __nv_fp8_e4m3(fabsf(F8E4M3_TO_FLOAT(a))); }
 __device__ __forceinline__ __nv_fp8_e4m3 copysigng(__nv_fp8_e4m3 a, __nv_fp8_e4m3 b) { return __nv_fp8_e4m3(copysignf(F8E4M3_TO_FLOAT(a), F8E4M3_TO_FLOAT(b))); }
 
-
-#endif

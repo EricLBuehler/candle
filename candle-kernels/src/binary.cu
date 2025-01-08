@@ -1,7 +1,6 @@
 #include "binary_op_macros.cuh"
 #include<stdint.h>
 
-#if __CUDA_ARCH__ >= 800
 #include "cuda_fp8.h"
 #include "cuda_bf16.h"
 
@@ -32,14 +31,7 @@ BINARY_OP_OUT(__nv_fp8_e4m3, uint8_t, lt_f8_e4m3, F8E4M3_TO_FLOAT(x) < F8E4M3_TO
 BINARY_OP_OUT(__nv_fp8_e4m3, uint8_t, le_f8_e4m3, F8E4M3_TO_FLOAT(x) <= F8E4M3_TO_FLOAT(y))
 BINARY_OP_OUT(__nv_fp8_e4m3, uint8_t, gt_f8_e4m3, F8E4M3_TO_FLOAT(x) > F8E4M3_TO_FLOAT(y))
 BINARY_OP_OUT(__nv_fp8_e4m3, uint8_t, ge_f8_e4m3, F8E4M3_TO_FLOAT(x) >= F8E4M3_TO_FLOAT(y))
-#endif
 
-#if __CUDA_ARCH__ >= 530
-#if __CUDA_ARCH__ < 800
-#include "cuda_bf16.h"
-BINARY_OP(__nv_bfloat16, bmul_bf16, x * y)
-BINARY_OP(__nv_bfloat16, badd_bf16, x + y)
-#endif
 BINARY_OP(__half, badd_f16, x + y)
 BINARY_OP(__half, bdiv_f16, x / y)
 BINARY_OP(__half, bmul_f16, x * y)
@@ -52,7 +44,6 @@ BINARY_OP_OUT(__half, uint8_t, lt_f16, x < y)
 BINARY_OP_OUT(__half, uint8_t, le_f16, x <= y)
 BINARY_OP_OUT(__half, uint8_t, gt_f16, x > y)
 BINARY_OP_OUT(__half, uint8_t, ge_f16, x >= y)
-#endif
 
 BINARY_OP(float, badd_f32, x + y)
 BINARY_OP(double, badd_f64, x + y);

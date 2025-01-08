@@ -97,7 +97,6 @@ __device__ T sign_(T t) {
 }
 
 
-#if __CUDA_ARCH__ >= 800
 #include "cuda_fp8.h"
 #include "cuda_bf16.h"
 
@@ -152,22 +151,7 @@ UNARY_OP(__nv_fp8_e4m3, usilu_fp8_e4m3, __nv_fp8_e4m3(silu_fwd(F8E4M3_TO_FLOAT(x
 UNARY_OP1(__nv_fp8_e4m3, upowf_fp8_e4m3, powg(x, param))
 UNARY_OP(__nv_fp8_e4m3, usign_fp8_e4m3, __nv_fp8_e4m3(sign_(F8E4M3_TO_FLOAT(x))))
 UNARY_OP(__nv_fp8_e4m3, usigmoid_fp8_e4m3, __nv_fp8_e4m3(sigmoid_fwd(F8E4M3_TO_FLOAT(x))))
-#endif
 
-#if __CUDA_ARCH__ >= 530
-#if __CUDA_ARCH__ < 800
-#include "cuda_bf16.h"
-template <typename T>
-__device__ __forceinline__ T silu_fwd_fallback(T x) {
-    const T one = T(1.0f);
-    const T neg_x = -x;
-    const T exp_neg_x = expg(neg_x);
-    return x / (one + exp_neg_x);
-}
-
-UNARY_OP(__nv_bfloat16, ucopy_bf16, x)
-UNARY_OP(__nv_bfloat16, usilu_bf16,  silu_fwd_fallback(x))
-#endif
 UNARY_OP(__half, ucopy_f16, x)
 UNARY_OP(__half, uneg_f16, -x)
 UNARY_OP(__half, urecip_f16, recipg(x))
@@ -192,7 +176,6 @@ UNARY_OP(__half, usilu_f16, silu_fwd(x))
 UNARY_OP1(__half, upowf_f16, powg(x, param))
 UNARY_OP(__half, usign_f16, sign_(x))
 UNARY_OP(__half, usigmoid_f16, sigmoid_fwd(x))
-#endif
 
 UNARY_OP(uint8_t, ucopy_u8, x)
 UNARY_OP(uint32_t, ucopy_u32, x)
