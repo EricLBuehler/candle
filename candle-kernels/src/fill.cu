@@ -54,4 +54,7 @@ COPY2D_OP(__nv_bfloat16, copy2d_bf16)
 
 extern "C" __global__ void fill_f8_e4m3(__nv_fp8_e4m3 *buf, __nv_fp8_e4m3 value, const size_t numel) { fill_with(buf, value, numel); }
 COPY2D_OP(__nv_fp8_e4m3, copy2d_f8_e4m3)
+#else
+extern "C" __global__ void fill_bf16(uint16_t *buf, uint16_t value, const size_t numel) { fill_with(buf, value, numel); }
+COPY2D_OP(__nv_bfloat16, copy2d_bf16)
 #endif
