@@ -706,8 +706,9 @@ impl candle::InplaceOp2 for AttnSoftmaxLastDim {
                 let (nrows_x, ncols_x) = (el / dim_m1, dim_m1);
 
                 const WARP_SIZE: usize = 32;
+                const CUDA_SOFT_MAX_BLOCK_SIZE: usize = 1024;
                 let mut nth = WARP_SIZE;
-                while nth < ncols_x && nth < 1024 {
+                while nth < ncols_x && nth < CUDA_SOFT_MAX_BLOCK_SIZE {
                     nth *= 2;
                 }
 
@@ -716,6 +717,7 @@ impl candle::InplaceOp2 for AttnSoftmaxLastDim {
                     block_dim: (nrows_x as u32, 1, 1),
                     shared_mem_bytes: (WARP_SIZE * std::mem::size_of::<f32>()) as u32,
                 };
+                dbg!(&cfg);
                 let func =
                     dev.get_or_load_func(&kernel_name::<T>("attn_soft_max"), kernels::REDUCE)?;
                 let params = (&a, &mask, &a, ncols_x as i32, nrows_y as i32, self.scale);
@@ -876,8 +878,9 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
                 let (nrows_x, ncols_x) = (el / dim_m1, dim_m1);
 
                 const WARP_SIZE: usize = 32;
+                const CUDA_SOFT_MAX_BLOCK_SIZE: usize = 1024;
                 let mut nth = WARP_SIZE;
-                while nth < ncols_x && nth < 1024 {
+                while nth < ncols_x && nth < CUDA_SOFT_MAX_BLOCK_SIZE {
                     nth *= 2;
                 }
 
