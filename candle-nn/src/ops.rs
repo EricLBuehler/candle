@@ -717,7 +717,6 @@ impl candle::InplaceOp2 for AttnSoftmaxLastDim {
                     block_dim: (nth as u32, 1, 1),
                     shared_mem_bytes: (WARP_SIZE * std::mem::size_of::<f32>()) as u32,
                 };
-                dbg!(&cfg);
                 let func =
                     dev.get_or_load_func(&kernel_name::<T>("attn_soft_max"), kernels::REDUCE)?;
                 let params = (&a, &mask, &a, ncols_x as i32, nrows_y as i32, self.scale);
