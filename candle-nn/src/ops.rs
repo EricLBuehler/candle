@@ -713,8 +713,8 @@ impl candle::InplaceOp2 for AttnSoftmaxLastDim {
                 }
 
                 let cfg = LaunchConfig {
-                    grid_dim: (nth as u32, 1, 1),
-                    block_dim: (nrows_x as u32, 1, 1),
+                    grid_dim: (nrows_x as u32, 1, 1),
+                    block_dim: (nth as u32, 1, 1),
                     shared_mem_bytes: (WARP_SIZE * std::mem::size_of::<f32>()) as u32,
                 };
                 dbg!(&cfg);
@@ -885,8 +885,8 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
                 }
 
                 let cfg = LaunchConfig {
-                    grid_dim: (nth as u32, 1, 1),
-                    block_dim: (nrows_x as u32, 1, 1),
+                    grid_dim: (nrows_x as u32, 1, 1),
+                    block_dim: (nth as u32, 1, 1),
                     shared_mem_bytes: (WARP_SIZE * std::mem::size_of::<f32>()) as u32,
                 };
                 let func =
