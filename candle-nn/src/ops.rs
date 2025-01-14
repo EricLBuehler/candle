@@ -621,7 +621,7 @@ impl candle::InplaceOp2 for AttnSoftmaxLastDim {
         {
             candle::bail!("attn-softmax-last-dim expects last 2 dims to match xs last 2 dims");
         }
-        if mask_l.dims().len() != 3 && mask_l.dim(0)? != a_l.dim(0)? {
+        if mask_l.dims().len() == 3 && mask_l.dim(0)? != a_l.dim(0)? {
             candle::bail!("attn-softmax-last-dim expects rank-3 mask bs to match xs bs");
         }
 
@@ -680,7 +680,7 @@ impl candle::InplaceOp2 for AttnSoftmaxLastDim {
         {
             candle::bail!("attn-softmax-last-dim expects last 2 dims to match xs last 2 dims");
         }
-        if mask_l.dims().len() != 3 && mask_l.dim(0)? != a_l.dim(0)? {
+        if mask_l.dims().len() == 3 && mask_l.dim(0)? != a_l.dim(0)? {
             candle::bail!("attn-softmax-last-dim expects rank-3 mask bs to match xs bs");
         }
 
@@ -813,7 +813,7 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
         {
             candle::bail!("attn-softmax-last-dim expects last 2 dims to match xs last 2 dims");
         }
-        if mask_l.dims().len() != 3 && mask_l.dim(0)? != a_l.dim(0)? {
+        if mask_l.dims().len() == 3 && mask_l.dim(0)? != a_l.dim(0)? {
             candle::bail!("attn-softmax-last-dim expects rank-3 mask bs to match xs bs");
         }
 
@@ -874,7 +874,7 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
         {
             candle::bail!("attn-softmax-last-dim expects last 2 dims to match xs last 2 dims");
         }
-        if mask_l.dims().len() != 3 && mask_l.dim(0)? != a_l.dim(0)? {
+        if mask_l.dims().len() == 3 && mask_l.dim(0)? != a_l.dim(0)? {
             candle::bail!("attn-softmax-last-dim expects rank-3 mask bs to match xs bs");
         }
 
