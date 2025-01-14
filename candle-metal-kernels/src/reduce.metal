@@ -935,9 +935,9 @@ kernel void attn_soft_max_4(
     const int64_t src_offset = i03*ne02*ne01*ne00 + i02*ne01*ne00 + i01*ne00;
     const int64_t b_idx = elem_per_batch > 0 ? src_offset / elem_per_batch : 0;
     const int64_t mask_offset = b_idx * (ne00*ne01) + i01*ne00;
-    device const T * psrc0 =                (device const T *) src0 + src_offset / 4;
+    device const T * psrc4 =                (device const T *) src0 + src_offset / 4;
     device const T * pmask = src1 != src0 ? (device const T *) src1 + mask_offset / 4 : nullptr;
-    device       T * pdst  =                (device       T *) dst  + src_offset / 4;
+    device       T * pdst4  =                (device       T *) dst  + src_offset / 4;
 
     float slope = 1.0f;
 
