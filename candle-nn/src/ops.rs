@@ -634,6 +634,7 @@ impl candle::InplaceOp2 for AttnSoftmaxLastDim {
             mask_s.buffer(),
             mask_l.start_offset() * mask_s.dtype().size_in_bytes(),
             a_l.dims(),
+            mask_l.dims(),
             self.scale,
             ty,
             &a_s.buffer(),
@@ -713,7 +714,7 @@ impl candle::InplaceOp2 for AttnSoftmaxLastDim {
                     0
                 } else {
                     let bs = dims[0];
-                    el / bs;
+                    el / bs
                 };
 
                 let (nrows_x, ncols_x) = (el / dim_m1, dim_m1);
@@ -827,6 +828,7 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
             mask_s.buffer(),
             mask_l.start_offset() * mask_s.dtype().size_in_bytes(),
             a_l.dims(),
+            mask_l.dims(),
             self.scale,
             ty,
             &output,
@@ -905,7 +907,7 @@ impl candle::CustomOp2 for AttnSoftmaxLastDim {
                     0
                 } else {
                     let bs = dims[0];
-                    el / bs;
+                    el / bs
                 };
                 let (nrows_x, ncols_x) = (el / dim_m1, dim_m1);
 
