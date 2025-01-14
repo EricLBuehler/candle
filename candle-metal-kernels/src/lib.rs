@@ -757,7 +757,7 @@ pub fn call_last_attn_softmax(
         let el: usize = input_shape.iter().product();
         el / bs
     };
-    
+
     let mut nth = 32; // SIMD width
     let name = if ne00 % 4 == 0 {
         while nth < ne00 / 4 && nth * ne01 * ne02 * ne03 < 256 {
