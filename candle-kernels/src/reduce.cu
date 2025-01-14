@@ -227,7 +227,7 @@ __device__ void softmax(const T * x, T * dst, const int ncols) {
 }
 
 template <typename T>
-__device__ void attn_soft_max(const T * x, const T * mask, T * dst, const int ncols, const int nrows_y, const float scale) {
+__device__ void attn_soft_max(const T * x, const T * mask, T * dst, const int ncols, const int nrows_y, const int elem_per_batch, const float scale) {
     const int tid  = threadIdx.x;
     const int rowx = blockIdx.x;
     const int rowy = rowx % nrows_y; // broadcast the mask in the row dimension
@@ -253,7 +253,9 @@ __device__ void attn_soft_max(const T * x, const T * mask, T * dst, const int nc
         }
 
         const int64_t ix = (int64_t)rowx*ncols + col;
-        const int64_t iy = (int64_t)rowy*ncols + col;
+
+        const int64_t b_idx = elem_per_batch > 0 ? ix / elem_per_batch : 1;
+        const int64_t iy = (int64_t)b_idx * (ncols*nrows_y) + rowy*ncols + col;
 
         const float val = float(x[ix]) * scale + (mask ? float(mask[iy]) : 0.0f);
 
@@ -323,6 +325,34 @@ __device__ void attn_soft_max(const T * x, const T * mask, T * dst, const int nc
 
         const int64_t idst = (int64_t)rowx*ncols + col;
         dst[idst] = float(vals[col]) * inv_sum;
+    }
+}
+
+template <typename T>
+__device__ void apply_mask_scale(const T * x, const T * mask, T * dst, const int ncols, const int nrows_y, const int elem_per_batch, const float scale) {
+    const int tid  = threadIdx.x;
+    const int rowx = blockIdx.x;
+    const int rowy = rowx % nrows_y; // broadcast the mask in the row dimension
+
+    const int block_size = blockDim.x;
+
+    float max_val = -INFINITY;
+
+#pragma unroll
+    for (int col0 = 0; col0 < ncols; col0 += block_size) {
+        const int col = col0 + tid;
+
+        if (col >= ncols) {
+            break;
+        }
+
+        const int64_t ix = (int64_t)rowx*ncols + col;
+
+        const int64_t b_idx = ix / elem_per_batch;
+        const int64_t iy = (int64_t)b_idx * (ncols*nrows_y) + rowy*ncols + col;
+
+        const float val = float(x[ix]) * scale + (mask ? float(mask[iy]) : 0.0f);
+        dst[ix] = T(val);
     }
 }
 
@@ -640,9 +670,23 @@ fast_argmax(const size_t src_numel, const size_t el_to_sum_per_block,
       TYPENAME * dst,                                                          \
       const int ncols,                                                         \
       const int nrows_y,                                                       \
+      const int elem_per_batch,                                                       \
       const float scale                                                       \
   ) {                                                                          \
-    attn_soft_max<TYPENAME>(x, mask, dst, ncols, nrows_y, scale);               \
+    attn_soft_max<TYPENAME>(x, mask, dst, ncols, nrows_y, elem_per_batch, scale);               \
+  }          
+
+#define MASK_SCALE_OP(TYPENAME, FN_NAME) \
+  extern "C" __global__ void FN_NAME(                                          \
+      const TYPENAME * x,                                                      \
+      const TYPENAME * mask,                                                   \
+      TYPENAME * dst,                                                          \
+      const int ncols,                                                         \
+      const int nrows_y,                                                       \
+      const int elem_per_batch,                                                       \
+      const float scale                                                       \
+  ) {                                                                          \
+    apply_mask_scale<TYPENAME>(x, mask, dst, ncols, nrows_y, elem_per_batch, scale);               \
   }                                                                            \
 
 #define RMSNORM_OP(TYPENAME, FN_NAME) \
@@ -695,6 +739,7 @@ fast_argmax(const size_t src_numel, const size_t el_to_sum_per_block,
 #include "cuda_bf16.h"
 SOFTMAX_OP(__nv_bfloat16, float, softmax_bf16)
 ATTN_SOFTMAX_OP(__nv_bfloat16, attn_soft_max_bf16)
+MASK_SCALE_OP(__nv_bfloat16, mask_scale_bf16)
 RMSNORM_OP(__nv_bfloat16, rmsnorm_bf16)
 LAYERNORM_OP(__nv_bfloat16, layernorm_bf16)
 ROPE_OP(__nv_bfloat16, rope_bf16, rope_i_bf16, rope_thd_bf16)
@@ -713,6 +758,7 @@ FAST_OP(__nv_bfloat16, fast_min_bf16, fast_max_bf16, fast_argmin_bf16, fast_argm
 #if __CUDA_ARCH__ >= 530
 SOFTMAX_OP(__half, float, softmax_f16)
 ATTN_SOFTMAX_OP(__half, attn_soft_max_f16)
+MASK_SCALE_OP(__half, mask_scale_f16)
 RMSNORM_OP(__half, rmsnorm_f16)
 LAYERNORM_OP(__half, layernorm_f16)
 ROPE_OP(__half, rope_f16, rope_i_f16, rope_thd_f16)
@@ -727,6 +773,8 @@ SOFTMAX_OP(float, float, softmax_f32)
 SOFTMAX_OP(double, double, softmax_f64)
 ATTN_SOFTMAX_OP(float, attn_soft_max_f32)
 ATTN_SOFTMAX_OP(double, attn_soft_max_f64)
+MASK_SCALE_OP(float, mask_scale_f32)
+MASK_SCALE_OP(double, mask_scale_f64)
 RMSNORM_OP(float, rmsnorm_f32)
 RMSNORM_OP(double, rmsnorm_f64)
 LAYERNORM_OP(float, layernorm_f32)

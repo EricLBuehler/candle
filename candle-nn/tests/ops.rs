@@ -4,7 +4,7 @@ extern crate intel_mkl_src;
 #[cfg(feature = "accelerate")]
 extern crate accelerate_src;
 
-use candle::{test_device, test_utils::to_vec3_round, Device, Result, Tensor};
+use candle::{test_device, test_utils::to_vec3_round, DType, Device, IndexOp, Result, Tensor};
 
 fn softmax(device: &Device) -> Result<()> {
     let data = &[[[3f32, 1., 4.], [1., 5., 9.]], [[2., 1., 7.], [8., 2., 8.]]];
@@ -65,6 +65,27 @@ fn inplace_softmax(device: &Device) -> Result<()> {
             [[0.2, 0.1, 0.7], [0.4444, 0.1111, 0.4444]]
         ]
     );
+    Ok(())
+}
+
+fn apply_mask_scale(device: &Device) -> Result<()> {
+    let cpu = &Device::Cpu;
+    let mut xs = Tensor::zeros((2, 2, 2, 2), DType::F32, cpu)?;
+    let mask = &[[[1f32, 1.], [1., 1.]], [[2., 2.], [2., 2.]]];
+    let mask = Tensor::new(mask, cpu)?;
+    candle_nn::ops::inplace_apply_mask_scale(&mut xs, &mask, 1.0)?;
+    let truth_0 = xs.i(0)?.to_vec3::<f32>()?;
+    let truth_1 = xs.i(1)?.to_vec3::<f32>()?;
+
+    let mut xs = Tensor::zeros((2, 2, 2, 2), DType::F32, device)?;
+    let mask = &[[[1f32, 1.], [1., 1.]], [[2., 2.], [2., 2.]]];
+    let mask = Tensor::new(mask, device)?;
+    candle_nn::ops::inplace_apply_mask_scale(&mut xs, &mask, 1.0)?;
+    let xs_0 = xs.i(0)?.to_vec3::<f32>()?;
+    let xs_1 = xs.i(1)?.to_vec3::<f32>()?;
+
+    assert_eq!(xs_0, truth_0);
+    assert_eq!(xs_1, truth_1);
     Ok(())
 }
 
@@ -274,6 +295,12 @@ test_device!(
     inplace_softmax_cpu,
     inplace_softmax_gpu,
     inplace_softmax_metal
+);
+test_device!(
+    apply_mask_scale,
+    apply_mask_scale_cpu,
+    apply_mask_scale_gpu,
+    apply_mask_scale_metal
 );
 test_device!(rms_norm, rms_norm_cpu, rms_norm_gpu, rms_norm_metal);
 test_device!(rms_norml, rms_norml_cpu, rms_norml_gpu, rms_norml_metal);
