@@ -2003,7 +2003,11 @@ pub fn call_sdpa_vector(
         alpha
     };
 
-    let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name)?;
+    let constants = Some(ConstantValues::new(vec![
+        (20, Value::Bool(/* sdpa_vector_has_mask */ false)),
+    ]));
+    
+    let pipeline = kernels.load_pipeline_with_constants(device, Source::Sdpa, &name, constants)?;
     let encoder = ep.encoder();
     let encoder: &ComputeCommandEncoderRef = encoder.as_ref();
     encoder.set_compute_pipeline_state(&pipeline);
@@ -2115,7 +2119,11 @@ pub fn call_sdpa_vector_2pass(
             alpha
         };
 
-        let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name_pass1)?;
+        let constants = Some(ConstantValues::new(vec![
+            (20, Value::Bool(/* sdpa_vector_has_mask */ false)),
+        ]));
+        
+        let pipeline = kernels.load_pipeline_with_constants(device, Source::Sdpa, &name_pass1, constants)?;
         let encoder = ep.encoder();
         let encoder: &ComputeCommandEncoderRef = encoder.as_ref();
         encoder.set_compute_pipeline_state(&pipeline);
