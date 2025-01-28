@@ -1,5 +1,5 @@
 [package]
-name = "baseten-candle-flash-attn-v3"
+name = "candle-flash-attn-v3"
 version = "0.0.1"
 edition = "2021"
 
