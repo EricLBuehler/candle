@@ -1,6 +1,6 @@
 [package]
 name = "candle-flash-attn"
-version.workspace = true
+version = "0.8.0"
 edition = "2021"
 
 description = "Flash attention layer for the candle ML framework."
