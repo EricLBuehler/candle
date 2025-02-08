@@ -1,5 +1,5 @@
 use super::{GgmlDType, QStorage};
-use crate::quantized::k_quants::GgmlType;
+use crate::quantized::quants::GgmlType;
 use crate::{backend::BackendDevice, cuda_backend::WrapErr};
 use crate::{CudaDevice, CudaStorage, Result};
 use half::f16;
