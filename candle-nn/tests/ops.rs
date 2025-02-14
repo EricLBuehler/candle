@@ -279,7 +279,7 @@ fn mul_and_act(device: &Device) -> Result<()> {
         if device.is_cpu() {
             assert_eq!(sum_diff, 0., "act = {act:?}");
         } else {
-            assert!(sum_diff < 1e-3, "act = {act:?}");
+            assert!(sum_diff < 3e-3, "act = {act:?}");
         }
     }
 

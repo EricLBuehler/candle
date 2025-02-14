@@ -1911,9 +1911,12 @@ impl candle::CustomOp2 for MulAndAct {
 /// - `gelu`
 /// - `silu`
 /// - `relu`
+///
+/// This is equivalent to:
+/// `act(a) * b`
 pub fn mul_and_act(a: &Tensor, b: &Tensor, act: Activation) -> Result<Tensor> {
     if a.device().is_cpu() || b.device().is_cpu() {
-        (a * b)?.apply(&act)
+        a.apply(&act)? * b
     } else {
         a.apply_op2(b, MulAndAct { act })
     }

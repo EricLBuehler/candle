@@ -302,7 +302,7 @@ kernel void FN_NAME( \
     } \
     TYPENAME x = left[tid]; \
     TYPENAME y = right[tid]; \
-    output[tid] = TYPENAME(ACT(float(x * y))); \
+    output[tid] = TYPENAME(ACT(float(x)) * float(y)); \
 }\
 kernel void FN_NAME_STRIDED( \
     constant size_t &dim, \
@@ -320,7 +320,7 @@ kernel void FN_NAME_STRIDED( \
     } \
     TYPENAME x = left[get_strided_index(tid, num_dims, dims, left_strides)]; \
     TYPENAME y = right[get_strided_index(tid, num_dims, dims, right_strides)]; \
-    output[tid] = TYPENAME(ACT(float(x * y))); \
+    output[tid] = TYPENAME(ACT(float(x)) * float(y)); \
 }
 
 #define MUL_ACT_TEMPLATE(ACT) \
