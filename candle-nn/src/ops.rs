@@ -1905,6 +1905,73 @@ impl candle::CustomOp2 for MulAndAct {
         let newstorage = candle::MetalStorage::new(output, device.clone(), elem_count, a_s.dtype());
         Ok((newstorage, a_l.shape().clone()))
     }
+
+    #[cfg(feature = "cuda")]
+    fn cuda_fwd(
+        &self,
+        a_s: &candle::CudaStorage,
+        a_l: &Layout,
+        b_s: &candle::CudaStorage,
+        b_l: &Layout,
+    ) -> Result<(candle::CudaStorage, Shape)> {
+        use candle::cuda::SlicePtrOrNull;
+        use candle::cuda_backend::cudarc::driver::{
+            CudaSlice, DeviceRepr, LaunchAsync, LaunchConfig,
+        };
+        use candle::cuda_backend::{kernel_name, kernels, Map2, WrapErr};
+        use candle::{CudaDevice, WithDType};
+
+        struct S {
+            act: Activation,
+        }
+        impl Map2 for S {
+            fn f<T: DeviceRepr + WithDType>(
+                &self,
+                lhs: &CudaSlice<T>,
+                lhs_l: &Layout,
+                rhs: &CudaSlice<T>,
+                rhs_l: &Layout,
+                dev: &CudaDevice,
+            ) -> Result<CudaSlice<T>> {
+                let shape = lhs_l.shape();
+                let dims = shape.dims();
+                let elem_count = shape.elem_count();
+                let cfg = LaunchConfig::for_num_elems(elem_count as u32);
+                let dims_and_strides = if lhs_l.is_contiguous() && rhs_l.is_contiguous() {
+                    SlicePtrOrNull::Null
+                } else {
+                    SlicePtrOrNull::Ptr(
+                        dev.htod_copy([dims, lhs_l.stride(), rhs_l.stride()].concat())
+                            .w()?,
+                    )
+                };
+                let lhs = &lhs.slice(lhs_l.start_offset()..);
+                let rhs = &rhs.slice(rhs_l.start_offset()..);
+                let name = match self.act {
+                    Activation::Gelu => "mul_act_gelu",
+                    Activation::Silu => "mul_act_silu",
+                    Activation::Relu => "mul_act_relu",
+                    act => candle::bail!("Expected activation one of gelu/relu/silu ({act:?}"),
+                };
+                let func = dev.get_or_load_func(&kernel_name::<T>(name), kernels::MUL_AND_ACT)?;
+                // SAFETY: Set later by running the kernel.
+                let out = unsafe { dev.alloc::<T>(elem_count) }.w()?;
+                let params = (elem_count, dims.len(), &dims_and_strides, lhs, rhs, &out);
+                // SAFETY: ffi
+                unsafe { func.launch(cfg, params) }.w()?;
+                Ok(out)
+            }
+        }
+
+        use candle::backend::BackendStorage;
+        let dev = a_s.device();
+        let slice = S { act: self.act }.map(&a_s.slice, a_l, &b_s.slice, b_l, dev)?;
+        let dst = candle::cuda_backend::CudaStorage {
+            slice,
+            device: dev.clone(),
+        };
+        Ok((dst, a_l.shape().clone()))
+    }
 }
 
 /// Elementwise multiply and activation. The following activations are supported:
