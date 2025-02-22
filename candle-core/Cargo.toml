@@ -20,6 +20,7 @@ gemm = { workspace = true }
 half = { workspace = true }
 float8 = { workspace = true }
 intel-mkl-src = { workspace = true, optional = true }
+itertools = "0.12.1"
 libc = { workspace = true, optional = true }
 memmap2 = { workspace = true }
 num-traits = { workspace = true }
@@ -46,6 +47,7 @@ nccl = ["cuda", "cudarc/nccl"]
 mkl = ["dep:libc", "dep:intel-mkl-src"]
 accelerate = ["dep:libc", "dep:accelerate-src"]
 metal = ["dep:metal", "dep:candle-metal-kernels"]
+arm-nightly-feat = []
 
 [[bench]]
 name = "bench_main"

@@ -1,6 +1,9 @@
-use super::with_tracing::{linear_no_bias as linear, Linear, RmsNorm};
-use candle::{DType, Device, IndexOp, Result, Tensor, D};
-use candle_nn::{embedding, Embedding, Module, VarBuilder};
+use super::with_tracing::RmsNorm;
+use candle::{
+    quantized::{GgmlDType, QMatMul, QTensor},
+    DType, Device, IndexOp, Result, Tensor, D,
+};
+use candle_nn::{embedding, linear_no_bias as linear, Embedding, Linear, Module, VarBuilder};
 use std::{collections::HashMap, f32::consts::PI};
 
 pub const DEFAULT_MAX_SEQ_LEN: usize = 4096;
@@ -225,10 +228,10 @@ impl Cache {
 
 #[derive(Debug, Clone)]
 struct CausalSelfAttention {
-    q_proj: Linear,
-    k_proj: Linear,
-    v_proj: Linear,
-    o_proj: Linear,
+    q_proj: QMatMul,
+    k_proj: QMatMul,
+    v_proj: QMatMul,
+    o_proj: QMatMul,
     num_attention_heads: usize,
     num_key_value_heads: usize,
     head_dim: usize,
@@ -365,6 +368,14 @@ impl CausalSelfAttention {
         let k_proj = linear(size_in, size_kv, vb.pp("k_proj"))?;
         let v_proj = linear(size_in, size_kv, vb.pp("v_proj"))?;
         let o_proj = linear(size_q, size_in, vb.pp("o_proj"))?;
+
+        println!("A");
+        let q_proj = QMatMul::from_qtensor(QTensor::quantize(q_proj.weight(), GgmlDType::Iq4Xs)?)?;
+        let k_proj = QMatMul::from_qtensor(QTensor::quantize(k_proj.weight(), GgmlDType::F32)?)?;
+        let v_proj = QMatMul::from_qtensor(QTensor::quantize(v_proj.weight(), GgmlDType::F32)?)?;
+        let o_proj = QMatMul::from_qtensor(QTensor::quantize(o_proj.weight(), GgmlDType::F32)?)?;
+        println!("B");
+
         Ok(Self {
             q_proj,
             k_proj,
@@ -511,7 +522,7 @@ impl Llama {
     pub fn load(vb: VarBuilder, cfg: &Config) -> Result<Self> {
         let wte = embedding(cfg.vocab_size, cfg.hidden_size, vb.pp("model.embed_tokens"))?;
         let lm_head = if cfg.tie_word_embeddings {
-            Linear::from_weights(wte.embeddings().clone(), None)
+            Linear::new(wte.embeddings().clone(), None)
         } else {
             linear(cfg.hidden_size, cfg.vocab_size, vb.pp("lm_head"))?
         };

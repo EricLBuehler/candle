@@ -1,13 +1,13 @@
-use super::utils::{
+mod utils;
+use super::k_quants::utils::{
     get_scale_min_k4, group_for_dequantization, group_for_quantization, make_q3_quants,
-    make_qkx1_quants, make_qx_quants, nearest_int,
+    make_qkx1_quants, make_qkx3_quants, make_qp_quants, make_qx_quants, nearest_int,
 };
-use super::GgmlDType;
-use crate::quantized::utils::{make_qkx3_quants, make_qp_quants};
+use super::{GgmlDType, GgmlType};
 use crate::Result;
 use byteorder::{ByteOrder, LittleEndian};
-use half::{bf16, f16};
-use rayon::prelude::*;
+use float8::F8E4M3;
+use half::f16;
 
 // Default to QK_K 256 rather than 64.
 pub const QK_K: usize = 256;
@@ -19,37 +19,6 @@ pub const QK5_0: usize = 32;
 pub const QK5_1: usize = 32;
 pub const QK8_0: usize = 32;
 pub const QK8_1: usize = 32;
-
-pub trait GgmlType: Sized + Clone + Send + Sync {
-    const DTYPE: GgmlDType;
-    const BLCK_SIZE: usize;
-    type VecDotType: GgmlType;
-
-    // This is only safe for types that include immediate values such as float/int/...
-    fn zeros() -> Self {
-        unsafe { std::mem::MaybeUninit::zeroed().assume_init() }
-    }
-    fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()>;
-    fn from_float(xs: &[f32], ys: &mut [Self]) -> Result<()>;
-    fn from_float_imatrix(
-        _xs: &[f32],
-        _ys: &mut [Self],
-        _imatrix_weights: &[f32],
-        _n_per_row: usize,
-    ) -> Result<()> {
-        crate::bail!(
-            "`from_float_imatrix` is unimplemented for {:?}",
-            Self::DTYPE
-        );
-    }
-
-    /// Dot product used as a building block for quantized mat-mul.
-    /// n is the number of elements to be considered.
-    fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32>;
-
-    /// Generic implementation of the dot product without simd optimizations.
-    fn vec_dot_unopt(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32>;
-}
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(C)]
@@ -94,6 +63,20 @@ pub struct BlockQ8_0 {
     pub(crate) qs: [i8; QK8_0],
 }
 const _: () = assert!(std::mem::size_of::<BlockQ8_0>() == 34);
+
+#[derive(Debug, Clone, PartialEq)]
+#[repr(C)]
+pub struct BlockF8Q8 {
+    d: F8E4M3,
+    pub(crate) qs: [i8; QK8_0],
+}
+const _: () = assert!(std::mem::size_of::<BlockF8Q8>() == 33);
+
+impl BlockF8Q8 {
+    pub fn dq_d(&self) -> f32 {
+        self.d.to_f32() / F8E4M3::MAX.to_f32()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(C)]
@@ -170,6 +153,7 @@ impl GgmlType for BlockQ4_0 {
     const DTYPE: GgmlDType = GgmlDType::Q4_0;
     const BLCK_SIZE: usize = QK4_0;
     type VecDotType = BlockQ8_0;
+    const SUPPORTS_I8MM: bool = true;
 
     // https://github.com/ggerganov/llama.cpp/blob/468ea24fb4633a0d681f7ac84089566c1c6190cb/ggml.c#L1525
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
@@ -264,12 +248,28 @@ impl GgmlType for BlockQ4_0 {
         }
         Ok(sumf)
     }
+
+    #[allow(unreachable_code)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q4_0_q8_0(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ4_1 {
     const DTYPE: GgmlDType = GgmlDType::Q4_1;
     const BLCK_SIZE: usize = QK4_1;
     type VecDotType = BlockQ8_1;
+    const SUPPORTS_I8MM: bool = false;
 
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
         Self::vec_dot_unopt(n, xs, ys)
@@ -359,12 +359,26 @@ impl GgmlType for BlockQ4_1 {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ5_0 {
     const DTYPE: GgmlDType = GgmlDType::Q5_0;
     const BLCK_SIZE: usize = QK5_0;
     type VecDotType = BlockQ8_0;
+    const SUPPORTS_I8MM: bool = false;
 
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
         let qk = Self::BLCK_SIZE;
@@ -461,12 +475,25 @@ impl GgmlType for BlockQ5_0 {
         }
         Ok(())
     }
+
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ5_1 {
     const DTYPE: GgmlDType = GgmlDType::Q5_1;
     const BLCK_SIZE: usize = QK5_1;
     type VecDotType = BlockQ8_1;
+    const SUPPORTS_I8MM: bool = false;
 
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
         Self::vec_dot_unopt(n, xs, ys)
@@ -569,12 +596,25 @@ impl GgmlType for BlockQ5_1 {
         }
         Ok(())
     }
+
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ8_0 {
     const DTYPE: GgmlDType = GgmlDType::Q8_0;
     const BLCK_SIZE: usize = QK8_0;
     type VecDotType = BlockQ8_0;
+    const SUPPORTS_I8MM: bool = true;
 
     // https://github.com/ggerganov/llama.cpp/blob/468ea24fb4633a0d681f7ac84089566c1c6190cb/ggml.c#L1619
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
@@ -659,12 +699,136 @@ impl GgmlType for BlockQ8_0 {
         }
         Ok(sumf)
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q8_0_q8_0(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
+}
+
+impl GgmlType for BlockF8Q8 {
+    const DTYPE: GgmlDType = GgmlDType::F8Q8;
+    const BLCK_SIZE: usize = QK8_0;
+    type VecDotType = BlockQ8_0;
+    const SUPPORTS_I8MM: bool = true;
+
+    // https://github.com/ggerganov/llama.cpp/blob/468ea24fb4633a0d681f7ac84089566c1c6190cb/ggml.c#L1619
+    fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
+        let k = ys.len();
+        if k % QK8_0 != 0 {
+            crate::bail!("dequantize_row_f8q8: {k} is not divisible by {QK8_0}");
+        }
+
+        let nb = k / QK8_0;
+
+        for i in 0..nb {
+            let d = xs[i].dq_d();
+
+            for j in 0..QK8_0 {
+                ys[i * QK8_0 + j] = xs[i].qs[j] as f32 * d;
+            }
+        }
+        Ok(())
+    }
+
+    fn from_float(xs: &[f32], ys: &mut [Self]) -> Result<()> {
+        // quantize_row_q8_0
+        let k = xs.len();
+        if k % Self::BLCK_SIZE != 0 {
+            crate::bail!("{k} is not divisible by {}", Self::BLCK_SIZE);
+        };
+        let nb = k / Self::BLCK_SIZE;
+        if ys.len() != nb {
+            crate::bail!(
+                "size mismatch {} {} {}",
+                xs.len(),
+                ys.len(),
+                Self::BLCK_SIZE
+            )
+        }
+        for (i, ys) in ys.iter_mut().enumerate() {
+            let mut amax = 0f32;
+            let xs = &xs[i * Self::BLCK_SIZE..(i + 1) * Self::BLCK_SIZE];
+            for &x in xs.iter() {
+                amax = amax.max(x.abs())
+            }
+            let d = amax / ((1 << 7) - 1) as f32;
+            let id = if d != 0f32 { 1. / d } else { 0. };
+            ys.d = F8E4M3::from_f32(d * F8E4M3::MAX.to_f32());
+            for (y, &x) in ys.qs.iter_mut().zip(xs.iter()) {
+                *y = f32::round(x * id) as i8
+            }
+        }
+        Ok(())
+    }
+
+    #[allow(unreachable_code)]
+    fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
+        #[cfg(target_feature = "avx")]
+        return super::avx::vec_dot_f8q8_q8_0(n, xs, ys);
+
+        #[cfg(target_feature = "neon")]
+        return super::neon::vec_dot_f8q8_q8_0(n, xs, ys);
+
+        #[cfg(target_feature = "simd128")]
+        return super::simd128::vec_dot_f8q8_q8_0(n, xs, ys);
+
+        Self::vec_dot_unopt(n, xs, ys)
+    }
+
+    fn vec_dot_unopt(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
+        let qk = QK8_0;
+        if n % QK8_0 != 0 {
+            crate::bail!("vec_dot_f8q8_q8_0: {n} is not divisible by {qk}")
+        }
+
+        // Generic implementation.
+        let mut sumf = 0f32;
+        for (xs, ys) in xs.iter().zip(ys.iter()) {
+            let sum_i = xs
+                .qs
+                .iter()
+                .zip(ys.qs.iter())
+                .map(|(&x, &y)| x as i32 * y as i32)
+                .sum::<i32>();
+            sumf += sum_i as f32 * xs.dq_d() * f16::to_f32(ys.d)
+        }
+        Ok(sumf)
+    }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_f8q8_q8_0(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ8_1 {
     const DTYPE: GgmlDType = GgmlDType::Q8_1;
     const BLCK_SIZE: usize = QK8_1;
     type VecDotType = BlockQ8_1;
+    const SUPPORTS_I8MM: bool = false;
 
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
         Self::vec_dot_unopt(n, xs, ys)
@@ -705,12 +869,23 @@ impl GgmlType for BlockQ8_1 {
     fn to_float(_xs: &[Self], _ys: &mut [f32]) -> Result<()> {
         unimplemented!("no support for vec-dot on Q8_1")
     }
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        _n: usize,
+        _xs_0: &[Self],
+        _xs_1: &[Self],
+        _ys_0: &[Self::VecDotType],
+        _ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        unimplemented!("no support for i8mm matmul on Q8_1")
+    }
 }
 
 impl GgmlType for BlockQ2K {
     const DTYPE: GgmlDType = GgmlDType::Q2K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = true;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -947,12 +1122,28 @@ impl GgmlType for BlockQ2K {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q2k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ3K {
     const DTYPE: GgmlDType = GgmlDType::Q3K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = false;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -1329,12 +1520,29 @@ impl GgmlType for BlockQ3K {
 
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q3k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ4K {
     const DTYPE: GgmlDType = GgmlDType::Q4K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = true;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -1594,6 +1802,22 @@ impl GgmlType for BlockQ4K {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(dead_code)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q4k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 // https://github.com/ggerganov/llama.cpp/blob/8183159cf3def112f6d1fe94815fce70e1bffa12/k_quants.c#L928
@@ -1601,6 +1825,7 @@ impl GgmlType for BlockQ5K {
     const DTYPE: GgmlDType = GgmlDType::Q5K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = true;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -1905,12 +2130,29 @@ impl GgmlType for BlockQ5K {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q5k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ6K {
     const DTYPE: GgmlDType = GgmlDType::Q6K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = true;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -2175,12 +2417,29 @@ impl GgmlType for BlockQ6K {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q6k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ8K {
     const DTYPE: GgmlDType = GgmlDType::Q8K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = false;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -2267,174 +2526,14 @@ impl GgmlType for BlockQ8K {
         }
         Ok(())
     }
-}
-
-// https://github.com/ggerganov/llama.cpp/blob/b5ffb2849d23afe73647f68eec7b68187af09be6/ggml.c#L10605
-pub fn matmul<T: GgmlType>(
-    mkn: (usize, usize, usize),
-    lhs: &[f32],
-    rhs_t: &[T],
-    dst: &mut [f32],
-) -> Result<()> {
-    let (m, k, n) = mkn;
-    if m * k != lhs.len() {
-        crate::bail!("unexpected lhs length {} {mkn:?}", lhs.len());
-    }
-
-    let k_in_lhs_blocks = k.div_ceil(T::BLCK_SIZE);
-    let k_in_rhs_blocks = k.div_ceil(T::VecDotType::BLCK_SIZE);
-    // TODO: Do not make this copy if the DotType is f32.
-    // TODO: Pre-allocate this.
-    let mut lhs_b = vec![T::VecDotType::zeros(); m * k_in_lhs_blocks];
-    for row_idx in 0..m {
-        let lhs_b = &mut lhs_b[row_idx * k_in_lhs_blocks..(row_idx + 1) * k_in_lhs_blocks];
-        let lhs = &lhs[row_idx * k..(row_idx + 1) * k];
-        T::VecDotType::from_float(lhs, lhs_b)?
-    }
-    let lhs_b = lhs_b.as_slice();
-
-    for row_idx in 0..m {
-        let lhs_row = &lhs_b[row_idx * k_in_lhs_blocks..(row_idx + 1) * k_in_lhs_blocks];
-        let dst_row = &mut dst[row_idx * n..(row_idx + 1) * n];
-
-        let result: Result<Vec<_>> = dst_row
-            .into_par_iter()
-            .enumerate()
-            .with_min_len(128)
-            .with_max_len(512)
-            .map(|(col_idx, dst)| {
-                let rhs_col = &rhs_t[col_idx * k_in_rhs_blocks..(col_idx + 1) * k_in_rhs_blocks];
-                T::vec_dot(k, rhs_col, lhs_row).map(|value| *dst = value)
-            })
-            .collect();
-
-        result?;
-    }
-    Ok(())
-}
-
-impl GgmlType for f32 {
-    const DTYPE: GgmlDType = GgmlDType::F32;
-    const BLCK_SIZE: usize = 1;
-    type VecDotType = f32;
-
-    fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
-        Self::vec_dot_unopt(n, xs, ys)
-    }
-
-    fn vec_dot_unopt(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
-        if xs.len() < n {
-            crate::bail!("size mismatch {} < {n}", xs.len())
-        }
-        if ys.len() < n {
-            crate::bail!("size mismatch {} < {n}", ys.len())
-        }
-        let mut res = 0f32;
-        unsafe { crate::cpu::vec_dot_f32(xs.as_ptr(), ys.as_ptr(), &mut res, n) };
-        Ok(res)
-    }
-
-    fn from_float(xs: &[f32], ys: &mut [Self]) -> Result<()> {
-        if xs.len() != ys.len() {
-            crate::bail!("size mismatch {} {}", xs.len(), ys.len());
-        }
-        ys.copy_from_slice(xs);
-        Ok(())
-    }
-
-    fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
-        if xs.len() != ys.len() {
-            crate::bail!("size mismatch {} {}", xs.len(), ys.len());
-        }
-        ys.copy_from_slice(xs);
-        Ok(())
-    }
-}
-
-impl GgmlType for f16 {
-    const DTYPE: GgmlDType = GgmlDType::F16;
-    const BLCK_SIZE: usize = 1;
-    type VecDotType = f16;
-
-    fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
-        Self::vec_dot_unopt(n, xs, ys)
-    }
-
-    fn vec_dot_unopt(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
-        if xs.len() < n {
-            crate::bail!("size mismatch {} < {n}", xs.len())
-        }
-        if ys.len() < n {
-            crate::bail!("size mismatch {} < {n}", ys.len())
-        }
-        let mut res = 0f32;
-        unsafe { crate::cpu::vec_dot_f16(xs.as_ptr(), ys.as_ptr(), &mut res, n) };
-        Ok(res)
-    }
-
-    fn from_float(xs: &[f32], ys: &mut [Self]) -> Result<()> {
-        if xs.len() != ys.len() {
-            crate::bail!("size mismatch {} {}", xs.len(), ys.len());
-        }
-        // TODO: vectorize
-        for (x, y) in xs.iter().zip(ys.iter_mut()) {
-            *y = f16::from_f32(*x)
-        }
-        Ok(())
-    }
-
-    fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
-        if xs.len() != ys.len() {
-            crate::bail!("size mismatch {} {}", xs.len(), ys.len());
-        }
-        // TODO: vectorize
-        for (x, y) in xs.iter().zip(ys.iter_mut()) {
-            *y = x.to_f32()
-        }
-        Ok(())
-    }
-}
-
-impl GgmlType for bf16 {
-    const DTYPE: GgmlDType = GgmlDType::BF16;
-    const BLCK_SIZE: usize = 1;
-    type VecDotType = bf16;
-
-    fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
-        Self::vec_dot_unopt(n, xs, ys)
-    }
-
-    fn vec_dot_unopt(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
-        if xs.len() < n {
-            crate::bail!("size mismatch {} < {n}", xs.len())
-        }
-        if ys.len() < n {
-            crate::bail!("size mismatch {} < {n}", ys.len())
-        }
-        let mut res = 0f32;
-        unsafe { crate::cpu::vec_dot_bf16(xs.as_ptr(), ys.as_ptr(), &mut res, n) };
-        Ok(res)
-    }
-
-    fn from_float(xs: &[f32], ys: &mut [Self]) -> Result<()> {
-        if xs.len() != ys.len() {
-            crate::bail!("size mismatch {} {}", xs.len(), ys.len());
-        }
-        // TODO: vectorize
-        for (x, y) in xs.iter().zip(ys.iter_mut()) {
-            *y = bf16::from_f32(*x)
-        }
-        Ok(())
-    }
-
-    fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
-        if xs.len() != ys.len() {
-            crate::bail!("size mismatch {} {}", xs.len(), ys.len());
-        }
-        // TODO: vectorize
-        for (x, y) in xs.iter().zip(ys.iter_mut()) {
-            *y = x.to_f32()
-        }
-        Ok(())
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        _n: usize,
+        _xs_0: &[Self],
+        _xs_1: &[Self],
+        _ys_0: &[Self::VecDotType],
+        _ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        unreachable!();
     }
 }
