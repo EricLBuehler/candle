@@ -4,10 +4,7 @@ use rayon::prelude::*;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-const KERNEL_FILES: &[&str] = &[
-    "flash_api.cu",
-    "flash_fwd_mla_bf16_sm90.cu",
-];
+const KERNEL_FILES: &[&str] = &["flash_api.cu", "flash_fwd_mla_bf16_sm90.cu"];
 
 fn main() -> Result<()> {
     // Use RAYON_NUM_THREADS or else default to the number of physical CPUs

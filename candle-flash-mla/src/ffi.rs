@@ -47,8 +47,7 @@ pub struct FlashFwdMlaParams {
     pub oaccum_ptr: *mut c_void,
 }
 
-pub const TILE_SCHEDULER_METADATA_SIZE: c_int = 8;
-
+pub const TILE_SCHEDULER_METADATA_SIZE: usize = 8;
 
 extern "C" {
     pub(crate) fn get_mla_metadata(
@@ -62,8 +61,5 @@ extern "C" {
         stream: CUstream,
     );
 
-    pub(crate) fn run_mha(
-        params: FlashFwdMlaParams,
-        stream: CUstream,
-    );
+    pub(crate) fn run_mha(params: FlashFwdMlaParams, stream: CUstream);
 }
