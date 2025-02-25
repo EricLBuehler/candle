@@ -1,5 +1,6 @@
 // Adapted from https://github.com/Dao-AILab/flash-attention/blob/main/csrc/flash_attn/flash_api.cpp
 
+#include "flash_fwd_mla_kernel.h"
 #include "flash_mla.h"
 #include "static_switch.h"
 
@@ -41,5 +42,5 @@ extern "C" void mha_fwd_kvcache_mla(
     const cudaStream_t stream
 ) {
     assert(params.d == 576);
-    run_mha_fwd_splitkv_mla<__nv_bfloat16, 576>(params, stream);
+    run_mha_fwd_splitkv_mla<cute::bfloat16_t, 576>(params, stream);
 }
