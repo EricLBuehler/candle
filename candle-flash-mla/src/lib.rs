@@ -172,11 +172,14 @@ impl FlashAttn {
             );
         }
 
-        let dst = unsafe {
+        let dst = unsafe { dev.alloc::<bf16>(b_sz * seqlen_q * num_heads * head_size_v) }.w()?;
+        let softmax_lse = dev.alloc_zeros::<f32>(b_sz * num_heads * seqlen_q).w()?;
+
+        let dst_accum = unsafe {
             dev.alloc::<bf16>((b_sz + num_sm_parts) * seqlen_q * num_heads * head_size_v)
         }
         .w()?;
-        let softmax_lse = dev
+        let softmax_lse_accum = dev
             .alloc_zeros::<f32>((b_sz + num_sm_parts) * num_heads * seqlen_q)
             .w()?;
 
@@ -218,8 +221,8 @@ impl FlashAttn {
                 as *mut core::ffi::c_int,
             num_sm_parts: num_sm_parts as i32,
             num_splits_ptr: (*num_splits.device_ptr()) as *mut core::ffi::c_int,
-            oaccum_ptr: (*dst.device_ptr()) as *mut core::ffi::c_void,
-            softmax_lseaccum_ptr: (*softmax_lse.device_ptr()) as *mut core::ffi::c_void,
+            oaccum_ptr: (*dst_accum.device_ptr()) as *mut core::ffi::c_void,
+            softmax_lseaccum_ptr: (*softmax_lse_accum.device_ptr()) as *mut core::ffi::c_void,
         };
 
         unsafe { ffi::mha_fwd_kvcache_mla(params, *dev.cu_stream()) }
@@ -303,7 +306,7 @@ pub fn flash_attn_mla(
     let q = q
         .reshape((b_sz, seqlen_q_ori, num_heads_k, ngroups, head_size))?
         .transpose(2, 3)?
-        .reshape((b_sz, seqlen_q, num_heads, head_size))?;
+        .reshape((b_sz, seqlen_q, num_heads_k, head_size))?;
 
     let out = q.apply_op3(k_cache, v_cache, op)?;
 
