@@ -110,6 +110,42 @@ impl FlashAttn {
         let num_heads = num_heads_k;
         let head_size_k = head_size_q;
 
+        if q_l.dims() != &[b_sz, seqlen_q, num_heads, head_size_q] {
+            candle::bail!(
+                "Expected q shape {:?}, got {:?} instead.",
+                [b_sz, seqlen_q, num_heads, head_size_q],
+                q_l.dims()
+            );
+        }
+        if k_l.dims() != &[num_blocks, page_block_size, num_heads_k, head_size_k] {
+            candle::bail!(
+                "Expected k shape {:?}, got {:?} instead.",
+                [num_blocks, page_block_size, num_heads_k, head_size_k],
+                k_l.dims()
+            );
+        }
+        if v_l.dims() != &[num_blocks, page_block_size, num_heads_k, head_size_v] {
+            candle::bail!(
+                "Expected k shape {:?}, got {:?} instead.",
+                [num_blocks, page_block_size, num_heads_k, head_size_v],
+                v_l.dims()
+            );
+        }
+        if self.block_table.dims() != &[b_sz, max_num_blocks_per_seq] {
+            candle::bail!(
+                "Expected block_table shape {:?}, got {:?} instead.",
+                [b_sz, max_num_blocks_per_seq],
+                self.block_table.dims()
+            );
+        }
+        if self.cache_seqlens.dims() != &[b_sz] {
+            candle::bail!(
+                "Expected cache_seqlens shape {:?}, got {:?} instead.",
+                [b_sz],
+                self.cache_seqlens.dims()
+            );
+        }
+
         let num_heads_per_head_k = num_heads / num_heads_k;
 
         // This should match the logic in the MLA kernel.
