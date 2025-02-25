@@ -222,7 +222,7 @@ impl FlashAttn {
             softmax_lseaccum_ptr: (*softmax_lse.device_ptr()) as *mut core::ffi::c_void,
         };
 
-        unsafe { ffi::run_mha(params, *dev.cu_stream()) }
+        unsafe { ffi::mha_fwd_kvcache_mla(params, *dev.cu_stream()) }
 
         let dst = candle::CudaStorage::wrap_cuda_slice(dst, dev.clone());
         Ok((dst, out_shape))

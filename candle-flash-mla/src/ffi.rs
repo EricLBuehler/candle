@@ -59,5 +59,5 @@ extern "C" {
         stream: CUstream,
     );
 
-    pub(crate) fn run_mha(params: FlashFwdMlaParams, stream: CUstream);
+    pub(crate) fn mha_fwd_kvcache_mla(params: FlashFwdMlaParams, stream: CUstream);
 }
