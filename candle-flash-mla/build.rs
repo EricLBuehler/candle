@@ -6,7 +6,11 @@ use std::str::FromStr;
 
 const CUDA_NVCC_FLAGS: Option<&'static str> = option_env!("CUDA_NVCC_FLAGS");
 
-const KERNEL_FILES: &[&str] = &["flash_api.cu", "flash_fwd_mla_bf16_sm90.cu"];
+const KERNEL_FILES: &[&str] = &[
+    "flash_api.cu",
+    "flash_fwd_mla_kernel.h",
+    "flash_fwd_mla_bf16_sm90.cu",
+];
 
 fn main() -> Result<()> {
     // Use RAYON_NUM_THREADS or else default to the number of physical CPUs
