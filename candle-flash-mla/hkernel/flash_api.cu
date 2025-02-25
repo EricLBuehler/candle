@@ -1,6 +1,7 @@
 // Adapted from https://github.com/Dao-AILab/flash-attention/blob/main/csrc/flash_attn/flash_api.cpp
 
 #include "flash_mla.h"
+#include "flash_fwd_mla_kernel.h"
 #include "static_switch.h"
 
 #include <assert.h>
