@@ -2,7 +2,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Flash_fwd_mla_params {
+extern "C" struct Flash_fwd_mla_params {
     using index_t = int64_t;
 
     int b, seqlen_q, d, d_v;

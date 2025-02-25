@@ -10,7 +10,7 @@
 
 #define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
 
-void get_mla_metadata(
+extern "C" void get_mla_metadata(
     int32_t* seqlens_k_ptr,
     int32_t* tile_scheduler_metadata_ptr, // [num_sm_parts, TileSchedulerMetaDataSize]
     int32_t* num_splits_ptr, // [batch_size + 1]
@@ -36,7 +36,7 @@ void get_mla_metadata(
     return;
 }
 
-void mha_fwd_kvcache_mla(
+extern "C" void mha_fwd_kvcache_mla(
     Flash_fwd_mla_params params,
     const cudaStream_t stream
 ) {
