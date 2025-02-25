@@ -4,6 +4,8 @@ use rayon::prelude::*;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+const CUDA_NVCC_FLAGS: Option<&'static str> = option_env!("CUDA_NVCC_FLAGS");
+
 const KERNEL_FILES: &[&str] = &["flash_api.cu", "flash_fwd_mla_bf16_sm90.cu"];
 
 fn main() -> Result<()> {
@@ -141,6 +143,12 @@ fn main() -> Result<()> {
                 if let Some(ccbin_path) = &ccbin_env {
                     command.arg("-allow-unsupported-compiler");
                     command.args(["-ccbin", ccbin_path]);
+                }
+
+                // https://github.com/EricLBuehler/mistral.rs/issues/286
+                if let Some(cuda_nvcc_flags_env) = CUDA_NVCC_FLAGS {
+                    command.arg("--compiler-options");
+                    command.arg(cuda_nvcc_flags_env);
                 }
 
                 // Add the source file
