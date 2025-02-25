@@ -62,7 +62,7 @@ fn main() -> Result<()> {
     // assert!(compute_cap == 90, "Compute capability must be 90 (90a)");
 
     // Our final library name
-    let out_file = build_dir.join("flashattentionmla.a");
+    let out_file = build_dir.join("libflashattentionmla.a");
 
     // Construct the list of (input_file -> output_object_file)
     let kernel_dir = PathBuf::from("hkernel");
