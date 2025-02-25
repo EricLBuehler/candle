@@ -54,8 +54,6 @@ extern "C" {
         seqlens_k_ptr: *mut c_int,
         tile_scheduler_metadata_ptr: *mut c_int,
         num_splits_ptr: *mut c_int,
-        num_heads_per_head_k: c_int,
-        num_heads_k: c_int,
         batch_size: c_int,
         num_sm_parts: c_int,
         stream: CUstream,

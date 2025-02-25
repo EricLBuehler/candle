@@ -8,18 +8,18 @@
 #include <cuda.h>
 #include <cuda_bf16.h>
 
+#define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
+
 void get_mla_metadata(
     int32_t* seqlens_k_ptr,
     int32_t* tile_scheduler_metadata_ptr, // [num_sm_parts, TileSchedulerMetaDataSize]
     int32_t* num_splits_ptr, // [batch_size + 1]
-    const int num_heads_per_head_k,
-    const int num_heads_k,
     const int batch_size,
     const int num_sm_parts,
     const cudaStream_t stream
 ) {
     // This should match the logic in the MLA kernel.
-    static constexpr int block_size_m = 64;
+    // static constexpr int block_size_m = 64; MOVED TO lib.rs
     static constexpr int block_size_n = 64;
     static constexpr int fixed_overhead_num_blocks = 5;
 
