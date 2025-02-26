@@ -27,7 +27,9 @@ impl FlashAttn {
         k_c_k_pe_cache_l: &Layout,
     ) -> Result<(candle::CudaStorage, Shape)> {
         let dev = q.device();
-        let out_shape = q_l.shape().clone();
+        let (b_sz, seqlen_q, num_heads, head_size_q) = q_l.shape().dims4()?;
+
+        let out_shape = Shape::from_dims(&[b_sz, seqlen_q, num_heads, self.head_size_v]);
         let out_l = Layout::contiguous(&out_shape);
 
         let q = q.as_cuda_slice::<bf16>()?;
@@ -69,8 +71,6 @@ impl FlashAttn {
         if self.block_table.stride()[self.block_table.stride().len() - 1] != 1 {
             candle::bail!("block_table must have contiguous last dim");
         }
-
-        let (b_sz, seqlen_q, num_heads, head_size_q) = q_l.shape().dims4()?;
 
         let max_num_blocks_per_seq = self.block_table.dim(1)?;
         let num_blocks = k_c_k_pe_cache_l.dim(0)?;
