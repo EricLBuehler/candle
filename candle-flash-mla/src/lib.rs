@@ -123,13 +123,6 @@ impl FlashAttn {
                 k_c_k_pe_cache_l.dims()
             );
         }
-        if v_l.dims() != &[num_blocks, page_block_size, num_heads_k, self.head_size_v] {
-            candle::bail!(
-                "Expected k shape {:?}, got {:?} instead.",
-                [num_blocks, page_block_size, num_heads_k, self.head_size_v],
-                v_l.dims()
-            );
-        }
         if self.block_table.dims() != &[b_sz, max_num_blocks_per_seq] {
             candle::bail!(
                 "Expected block_table shape {:?}, got {:?} instead.",
