@@ -44,17 +44,13 @@ fn sdpa(
 }
 
 #[rstest(
-    // b => [128],
-    b => [1],
-    // s_k => [4096, 8192],
-    s_k => [4096],
-    // h_q => [16, 32, 64, 128], // TP = 8, 4, 2, 1
-    h_q => [128],
+    b => [128],
+    s_k => [4096, 8192],
+    h_q => [16, 32, 64, 128], // TP = 8, 4, 2, 1
     // s_q => [1, 2], // MTP = 1, 2
-    s_q => [1], // MTP = 1, 2
+    s_q => [1],
 )]
 fn flash_mla_param(b: usize, s_k: usize, h_q: usize, s_q: usize) -> Result<()> {
-    dbg!(b, s_k, h_q, s_q);
     let device = Device::new_cuda(0)?;
 
     let h_kv = 1;
@@ -115,15 +111,18 @@ fn flash_mla_param(b: usize, s_k: usize, h_q: usize, s_q: usize) -> Result<()> {
 
     assert_eq!(out_flash.dims(), truth.dims());
 
-    let cos_diff = 1.
-        - 2. * (out_flash.to_dtype(DType::F32)? * truth.to_dtype(DType::F32)?)?
-            .sum_all()?
-            .to_scalar::<f32>()?
-            / (out_flash.sqr()?.to_dtype(DType::F32)? + truth.sqr()?.to_dtype(DType::F32)?)?
-                .sum_all()?
-                .to_scalar::<f32>()?
-                .max(1e-12);
-    assert!(cos_diff < 1e-5, "{cos_diff} > {}", 1e-5);
+    {
+        let out_flash = out_flash.to_dtype(DType::F64)?;
+        let truth = truth.to_dtype(DType::F64)?;
+
+        let cos_diff = 1.
+            - 2. * (&out_flash * &truth)?.sum_all()?.to_scalar::<f64>()?
+                / (out_flash.sqr()? + truth.sqr()?)?
+                    .sum_all()?
+                    .to_scalar::<f64>()?
+                    .max(1e-12);
+        assert!(cos_diff < 1e-5, "{cos_diff} > {}", 1e-5);
+    }
 
     Ok(())
 }

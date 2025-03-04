@@ -105,33 +105,33 @@ impl FlashAttn {
             .as_cuda_slice::<i32>()?
             .slice(self.cache_seqlens.layout().start_offset()..);
 
-        let is_causal = if self.seqlen_q_ori == 1 { false } else { true };
+        let is_causal = self.seqlen_q_ori != 1;
 
         let num_heads = num_heads_k;
         let head_size_k = head_size_q;
 
-        if q_l.dims() != &[b_sz, seqlen_q, num_heads, head_size_q] {
+        if q_l.dims() != [b_sz, seqlen_q, num_heads, head_size_q] {
             candle::bail!(
                 "Expected q shape {:?}, got {:?} instead.",
                 [b_sz, seqlen_q, num_heads, head_size_q],
                 q_l.dims()
             );
         }
-        if k_c_k_pe_cache_l.dims() != &[num_blocks, page_block_size, num_heads_k, head_size_k] {
+        if k_c_k_pe_cache_l.dims() != [num_blocks, page_block_size, num_heads_k, head_size_k] {
             candle::bail!(
                 "Expected k shape {:?}, got {:?} instead.",
                 [num_blocks, page_block_size, num_heads_k, head_size_k],
                 k_c_k_pe_cache_l.dims()
             );
         }
-        if self.block_table.dims() != &[b_sz, max_num_blocks_per_seq] {
+        if self.block_table.dims() != [b_sz, max_num_blocks_per_seq] {
             candle::bail!(
                 "Expected block_table shape {:?}, got {:?} instead.",
                 [b_sz, max_num_blocks_per_seq],
                 self.block_table.dims()
             );
         }
-        if self.cache_seqlens.dims() != &[b_sz] {
+        if self.cache_seqlens.dims() != [b_sz] {
             candle::bail!(
                 "Expected cache_seqlens shape {:?}, got {:?} instead.",
                 [b_sz],
@@ -267,13 +267,11 @@ impl candle::CustomOp2 for FlashAttn {
 /// FlashMLA layer.
 ///
 /// This implements MLA attention, `softmax(Q @ K^T . softmax_scale) @ V`.
-/// Multi-query and grouped-query attention are supported by using tensors k and v with fewer heads
-/// than q, the number of heads in k and v has to be divisible by the number of heads in q.
 ///
 /// # Arguments
 ///
-/// * `q: (batch_size, seq_len_q, num_heads_q, head_dim).
-/// * `k_cache`: (num_blocks, page_block_size, num_heads_k, head_dim).
+/// * `q`: (batch_size, seq_len_q, num_heads_q, head_dim).
+/// * `k_c_k_pe_cache`: (num_blocks, page_block_size, num_heads_k, head_dim).
 /// * `block_table`: (batch_size, max_num_blocks_per_seq), i32.
 /// * `cache_seqlens`: (batch_size), i32
 /// * `softmax_scale: The scale of QK^T before applying softmax.
@@ -295,7 +293,6 @@ pub fn flash_attn_mla(
 
     let seqlen_q = seqlen_q_ori * ngroups;
     let num_heads_per_head_k = num_heads / num_heads_k;
-    dbg!(num_heads_per_head_k);
 
     let q = q
         .reshape((b_sz, seqlen_q_ori, num_heads_k, ngroups, head_size))?
