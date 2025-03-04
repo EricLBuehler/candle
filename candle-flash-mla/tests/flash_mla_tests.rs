@@ -3,6 +3,23 @@ use candle::{DType, Device, IndexOp, Tensor, D};
 use candle_flash_mla;
 use rstest::rstest;
 
+pub trait RepeatInterleaveOp {
+    fn repeat_interleave(&self, repeats: usize, dim: usize) -> candle::Result<Tensor>;
+}
+
+impl RepeatInterleaveOp for Tensor {
+    fn repeat_interleave(&self, repeats: usize, dim: usize) -> candle::Result<Tensor> {
+        #[allow(clippy::cast_possible_truncation)]
+        let indices = Tensor::new(
+            (0..self.dim(dim)?)
+                .flat_map(|i| vec![i as u32; repeats])
+                .collect::<Vec<_>>(),
+            self.device(),
+        )?;
+        self.index_select(&indices, dim)
+    }
+}
+
 fn sdpa(
     q: &Tensor,
     k: &Tensor,
@@ -16,8 +33,8 @@ fn sdpa(
     let k = k.to_dtype(DType::F32)?;
     let v = v.to_dtype(DType::F32)?;
 
-    let v = Tensor::cat(&vec![&v; h_q / h_kv], 0)?;
-    let k = Tensor::cat(&vec![&k; h_q / h_kv], 0)?;
+    let k = k.repeat_interleave(h_q / h_kv, 0)?;
+    let v = v.repeat_interleave(h_q / h_kv, 0)?;
 
     let att = (q.matmul(&k.t()?)? * softmax_scale as f64)?;
     let att = candle_nn::ops::softmax(&att, D::Minus1)?;

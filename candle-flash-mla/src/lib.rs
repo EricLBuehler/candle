@@ -306,7 +306,7 @@ pub fn flash_attn_mla(
         cache_seqlens,
         head_size_v,
         seqlen_q_ori,
-        ngroups
+        ngroups,
     };
 
     let out = q.apply_op2(k_c_k_pe_cache, op)?;
