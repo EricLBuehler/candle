@@ -164,8 +164,7 @@ impl FlashAttn {
             );
         }
 
-        let dst =
-            unsafe { dev.alloc::<T>(b_sz * seqlen_q * num_heads * self.head_size_v) }.w()?;
+        let dst = unsafe { dev.alloc::<T>(b_sz * seqlen_q * num_heads * self.head_size_v) }.w()?;
         let softmax_lse = dev.alloc_zeros::<f32>(b_sz * num_heads * seqlen_q).w()?;
 
         let dst_accum = unsafe {
