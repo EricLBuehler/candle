@@ -14,6 +14,8 @@ pub struct FlashAttn {
     pub block_table: Tensor,
     pub cache_seqlens: Tensor,
     pub head_size_v: usize,
+    pub seqlen_q_ori: usize,
+    pub ngroups: usize,
 }
 
 impl FlashAttn {
@@ -102,10 +104,8 @@ impl FlashAttn {
             .as_cuda_slice::<i32>()?
             .slice(self.cache_seqlens.layout().start_offset()..);
 
-        let is_causal = if seqlen_q == 1 { false } else { true };
+        let is_causal = if self.seqlen_q_ori == 1 { false } else { true };
 
-        let ngroups = num_heads / num_heads_k;
-        let seqlen_q = seqlen_q * ngroups;
         let num_heads = num_heads_k;
         let head_size_k = head_size_q;
 
@@ -192,7 +192,7 @@ impl FlashAttn {
             cu_seqlens_k: (*cache_seqlens.device_ptr()) as *mut core::ffi::c_int,
             h: num_heads as i32,
             h_h_k_ratio: num_heads_per_head_k as i32,
-            ngroups: ngroups as i32,
+            ngroups: self.ngroups as i32,
             is_causal,
             d: head_size_q as i32,
             d_v: self.head_size_v as i32,
@@ -288,13 +288,6 @@ pub fn flash_attn_mla(
     softmax_scale: f32,
     head_size_v: usize,
 ) -> Result<Tensor> {
-    let op = FlashAttn {
-        softmax_scale,
-        block_table,
-        cache_seqlens,
-        head_size_v,
-    };
-
     let (b_sz, seqlen_q_ori, num_heads, head_size) = q.shape().dims4()?;
 
     let num_heads_k = k_c_k_pe_cache.dim(2)?;
@@ -306,6 +299,15 @@ pub fn flash_attn_mla(
         .reshape((b_sz, seqlen_q_ori, num_heads_k, ngroups, head_size))?
         .transpose(2, 3)?
         .reshape((b_sz, seqlen_q, num_heads_k, head_size))?;
+
+    let op = FlashAttn {
+        softmax_scale,
+        block_table,
+        cache_seqlens,
+        head_size_v,
+        seqlen_q_ori,
+        ngroups
+    };
 
     let out = q.apply_op2(k_c_k_pe_cache, op)?;
 

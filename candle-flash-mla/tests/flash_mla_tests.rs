@@ -3,20 +3,6 @@ use candle::{DType, Device, IndexOp, Tensor, D};
 use candle_flash_mla;
 use rstest::rstest;
 
-fn to_vec3_round(t: Tensor, digits: i32) -> Result<Vec<Vec<Vec<f32>>>> {
-    let b = 10f32.powi(digits);
-    let t = t.to_vec3::<f32>()?;
-    let t = t
-        .iter()
-        .map(|t| {
-            t.iter()
-                .map(|t| t.iter().map(|t| f32::round(t * b) / b).collect())
-                .collect()
-        })
-        .collect();
-    Ok(t)
-}
-
 fn sdpa(
     q: &Tensor,
     k: &Tensor,
@@ -47,6 +33,7 @@ fn sdpa(
     s_q => [1, 2], // MTP = 1, 2
 )]
 fn flash_mla_param(b: usize, s_k: usize, h_q: usize, s_q: usize) -> Result<()> {
+    dbg!(b, s_k, h_q, s_q);
     let device = Device::new_cuda(0)?;
 
     let h_kv = 1;
@@ -55,7 +42,6 @@ fn flash_mla_param(b: usize, s_k: usize, h_q: usize, s_q: usize) -> Result<()> {
 
     let cache_seqlens_vec = vec![s_k as i32; b];
     let cache_seqlens = Tensor::new(cache_seqlens_vec.clone(), &device)?;
-    let total_seqlens = cache_seqlens.sum_all()?.to_scalar::<i32>()? as usize;
     let max_seqlen = cache_seqlens.max(0)?.to_scalar::<i32>()? as usize;
     let max_seqlen_pad = max_seqlen.div_ceil(256) * 256;
 
@@ -107,14 +93,16 @@ fn flash_mla_param(b: usize, s_k: usize, h_q: usize, s_q: usize) -> Result<()> {
     };
 
     assert_eq!(out_flash.dims(), truth.dims());
-    println!(
-        "MLA {}; TRUTH {}",
-        out_flash
-            .to_dtype(DType::F32)?
-            .mean_all()?
-            .to_scalar::<f32>()?,
-        truth.to_dtype(DType::F32)?.mean_all()?.to_scalar::<f32>()?
-    );
+
+    let cos_diff = 1.
+        - 2. * (out_flash.to_dtype(DType::F32)? * truth.to_dtype(DType::F32)?)?
+            .sum_all()?
+            .to_scalar::<f32>()?
+            / (out_flash.sqr()?.to_dtype(DType::F32)? + truth.sqr()?.to_dtype(DType::F32)?)?
+                .sum_all()?
+                .to_scalar::<f32>()?
+                .max(1e-12);
+    assert!(cos_diff < 1e-5, "{cos_diff}");
 
     Ok(())
 }
