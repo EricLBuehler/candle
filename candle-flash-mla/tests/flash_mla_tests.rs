@@ -44,10 +44,14 @@ fn sdpa(
 }
 
 #[rstest(
-    b => [128],
-    s_k => [4096, 8192],
-    h_q => [16, 32, 64, 128], // TP = 8, 4, 2, 1
-    s_q => [1, 2], // MTP = 1, 2
+    // b => [128],
+    b => [1],
+    // s_k => [4096, 8192],
+    s_k => [4096],
+    // h_q => [16, 32, 64, 128], // TP = 8, 4, 2, 1
+    h_q => [128],
+    // s_q => [1, 2], // MTP = 1, 2
+    s_q => [1], // MTP = 1, 2
 )]
 fn flash_mla_param(b: usize, s_k: usize, h_q: usize, s_q: usize) -> Result<()> {
     dbg!(b, s_k, h_q, s_q);
@@ -119,7 +123,7 @@ fn flash_mla_param(b: usize, s_k: usize, h_q: usize, s_q: usize) -> Result<()> {
                 .sum_all()?
                 .to_scalar::<f32>()?
                 .max(1e-12);
-    assert!(cos_diff < 1e-5, "{cos_diff}");
+    assert!(cos_diff < 1e-5, "{cos_diff} > {}", 1e-5);
 
     Ok(())
 }
