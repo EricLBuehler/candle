@@ -10,7 +10,6 @@ members = [
     "candle-wasm-examples/*",
     "candle-wasm-tests",
     "tensor-tools",
-    "candle-flash-mla",
 ]
 exclude = [
    "candle-flash-attn",
@@ -18,6 +17,7 @@ exclude = [
    "candle-kernels",
    "candle-metal-kernels",
    "candle-onnx",
+   "candle-flash-mla",
 ]
 resolver = "2"
 
