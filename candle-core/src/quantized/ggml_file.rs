@@ -1,6 +1,6 @@
 //! Support for the GGML file format.
 
-use super::{k_quants, GgmlDType, QStorage};
+use super::{iq_quants, k_quants, GgmlDType, QStorage};
 use crate::{Device, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
@@ -183,6 +183,9 @@ pub fn qtensor_from_ggml(
         }
         GgmlDType::Q6K => {
             from_raw_data::<k_quants::BlockQ6K>(raw_data, size_in_bytes, dims, device)
+        }
+        GgmlDType::Iq4Xs => {
+            from_raw_data::<iq_quants::BlockIQ4xs>(raw_data, size_in_bytes, dims, device)
         }
         _ => crate::bail!("quantized type {ggml_dtype:?} is not supported yet"),
     }
