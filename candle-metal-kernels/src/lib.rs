@@ -1832,7 +1832,7 @@ pub fn call_sdpa_full(
             variation: "full",
             got: bd,
             expected: vec![32, 64, 72, 80, 96, 128, 256],
-        })
+        });
     };
     let bk = if bd < 128 { 32 } else { 16 };
 

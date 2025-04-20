@@ -1612,8 +1612,13 @@ impl candle::CustomOp3 for Sdpa {
         let q_seq = q_l.dim(2)?;
 
         let mut implementation_supports_use_case = q_head == k_head;
-        let supported_head_dim =
-            q_head == 32 || q_head == 64 || q_head == 72 || q_head == 80 || q_head == 96 || q_head == 128 || q_head == 256;
+        let supported_head_dim = q_head == 32
+            || q_head == 64
+            || q_head == 72
+            || q_head == 80
+            || q_head == 96
+            || q_head == 128
+            || q_head == 256;
 
         let supports_sdpa_full = supported_head_dim;
         let supports_sdpa_vector = q_seq == 1 && supported_head_dim;
