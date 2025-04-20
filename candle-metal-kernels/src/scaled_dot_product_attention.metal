@@ -2305,9 +2305,13 @@ template <
   attention, dtype, bq, bk, bd, wm, wn, mtype, float)
 
 #define instantiate_attn_shapes_helper(iname, itype, mname, mtype)  \
+    instantiate_attn(iname, itype, 32, 16, 256, 4, 1, mname, mtype) \
     instantiate_attn(iname, itype, 32, 16, 128, 4, 1, mname, mtype) \
+    instantiate_attn(iname, itype, 32, 32,  96, 4, 1, mname, mtype) \
     instantiate_attn(iname, itype, 32, 32,  80, 4, 1, mname, mtype) \
-    instantiate_attn(iname, itype, 32, 32,  64, 4, 1, mname, mtype)
+    instantiate_attn(iname, itype, 32, 32,  72, 4, 1, mname, mtype) \
+    instantiate_attn(iname, itype, 32, 32,  64, 4, 1, mname, mtype) \
+    instantiate_attn(iname, itype, 32, 32,  32, 4, 1, mname, mtype)
 
 #define instantiate_attn_mask_helper(iname, itype) \
     instantiate_attn_shapes_helper(iname, itype, iname, itype) \
@@ -2370,6 +2374,8 @@ instantiate_attn_mask_helper(float32, float);
 #define instantiate_sdpa_vector_heads(type) \
   instantiate_sdpa_vector(type, 32)         \
   instantiate_sdpa_vector(type, 64)         \
+  instantiate_sdpa_vector(type, 72)         \
+  instantiate_sdpa_vector(type, 80)         \
   instantiate_sdpa_vector(type, 96)         \
   instantiate_sdpa_vector(type, 128)         \
   instantiate_sdpa_vector(type, 256)
