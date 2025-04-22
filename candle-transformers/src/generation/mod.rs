@@ -1,5 +1,6 @@
 use candle::{DType, Error, Result, Tensor};
-use rand::{distributions::Distribution, SeedableRng};
+use rand::SeedableRng;
+use rand::distr::{Distribution, weighted::WeightedIndex};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Sampling {
@@ -45,7 +46,7 @@ impl LogitsProcessor {
     }
 
     fn sample_multinomial(&mut self, prs: &Vec<f32>) -> Result<u32> {
-        let distr = rand::distributions::WeightedIndex::new(prs).map_err(Error::wrap)?;
+        let distr = rand::distr::weighted::WeightedIndex::new(prs).map_err(Error::wrap)?;
         let next_token = distr.sample(&mut self.rng) as u32;
         Ok(next_token)
     }
