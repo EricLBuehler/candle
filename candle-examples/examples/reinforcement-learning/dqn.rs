@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use rand::distributions::Uniform;
+use rand::distr::Uniform;
 use rand::{thread_rng, Rng};
 
 use candle::{DType, Device, Module, Result, Tensor};

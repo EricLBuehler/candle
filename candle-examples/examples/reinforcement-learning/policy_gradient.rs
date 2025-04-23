@@ -4,7 +4,7 @@ use candle_nn::{
     linear, ops::log_softmax, ops::softmax, sequential::seq, Activation, AdamW, Optimizer,
     ParamsAdamW, VarBuilder, VarMap,
 };
-use rand::{distributions::Distribution, rngs::ThreadRng, Rng};
+use rand::{distr::Distribution, rngs::ThreadRng, Rng};
 
 fn new_model(
     input_shape: &[usize],
@@ -39,7 +39,7 @@ fn accumulate_rewards(steps: &[Step<i64>]) -> Vec<f64> {
 }
 
 fn weighted_sample(probs: Vec<f32>, rng: &mut ThreadRng) -> Result<usize> {
-    let distribution = rand::distributions::WeightedIndex::new(probs).map_err(Error::wrap)?;
+    let distribution = rand::distr::weighted::WeightedIndex::new(probs).map_err(Error::wrap)?;
     let mut rng = rng;
     Ok(distribution.sample(&mut rng))
 }
