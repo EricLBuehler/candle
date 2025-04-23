@@ -1,4 +1,4 @@
-#![allow(clippy::redundant_closure_call)]
+#![allow(clippy::redundant_closure_call, clippy::useless_conversion)]
 use float8::F8E4M3;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -936,7 +936,7 @@ impl PyTensor {
         Ok(PyTensor(self.0.contiguous().map_err(wrap_err)?))
     }
 
-    /// Returns true if the tensor is contiguous in C order.
+    /// Returns true if the tensor is contiguous in memory.
     /// &RETURNS&: bool
     fn is_contiguous(&self) -> bool {
         self.0.is_contiguous()
