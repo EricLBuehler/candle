@@ -2,11 +2,11 @@ use std::collections::VecDeque;
 use std::fmt::Display;
 
 use candle::{DType, Device, Error, Module, Result, Tensor, Var};
+use candle_nn::ops;
 use candle_nn::{
     func, linear, sequential::seq, Activation, AdamW, Optimizer, ParamsAdamW, Sequential,
     VarBuilder, VarMap,
 };
-use candle_nn::ops;
 use rand::{distr::Uniform, thread_rng, Rng};
 
 use super::gym_env::GymEnv;

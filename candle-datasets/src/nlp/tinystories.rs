@@ -60,8 +60,8 @@ pub struct DatasetRandomIter<'a> {
 
 impl<'a> DatasetRandomIter<'a> {
     pub fn new(ds: &'a Dataset, valid: bool, seq_len: usize, device: Device) -> Self {
-        use rand::seq::SliceRandom;
         use rand::rng;
+        use rand::seq::SliceRandom;
 
         let all_tokens = if valid {
             &ds.valid_tokens
@@ -92,8 +92,8 @@ impl Iterator for DatasetRandomIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         use byteorder::{LittleEndian, ReadBytesExt};
-        use rand::seq::SliceRandom;
         use rand::rng;
+        use rand::seq::SliceRandom;
 
         let seq_len = self.seq_len;
         if self.indexes_in_bytes.is_empty() {

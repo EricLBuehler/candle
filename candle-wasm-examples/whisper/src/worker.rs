@@ -3,7 +3,11 @@ use anyhow::Error as E;
 use candle::{safetensors::Load, DType, Device, IndexOp, Tensor, D};
 use candle_nn::{ops::softmax, VarBuilder};
 pub use candle_transformers::models::whisper::{self as m, Config};
-use rand::{distr::{Distribution, weighted::WeightedIndex}, rngs::StdRng, SeedableRng};
+use rand::{
+    distr::{weighted::WeightedIndex, Distribution},
+    rngs::StdRng,
+    SeedableRng,
+};
 use serde::{Deserialize, Serialize};
 use tokenizers::Tokenizer;
 use wasm_bindgen::prelude::*;

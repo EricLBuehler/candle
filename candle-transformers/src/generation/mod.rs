@@ -1,6 +1,6 @@
 use candle::{DType, Error, Result, Tensor};
+use rand::distr::{weighted::WeightedIndex, Distribution};
 use rand::SeedableRng;
-use rand::distr::{Distribution, weighted::WeightedIndex};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Sampling {
