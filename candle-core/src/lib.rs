@@ -47,6 +47,11 @@
 //! - [candle-transformers](https://docs.rs/candle-transformers/). Candle implemntation of many published transformer models.
 //!
 
+#![cfg_attr(feature = "arm-nightly-feat", feature(stdarch_neon_dotprod))]
+#![cfg_attr(feature = "arm-nightly-feat", feature(array_chunks))]
+#![cfg_attr(feature = "arm-nightly-feat", feature(stdarch_neon_i8mm))]
+#![cfg_attr(feature = "arm-nightly-feat", feature(portable_simd))]
+
 #[cfg(feature = "accelerate")]
 mod accelerate;
 pub mod backend;
