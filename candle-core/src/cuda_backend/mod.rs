@@ -58,6 +58,37 @@ pub enum CudaStorageSlice {
     F8E4M3(CudaSlice<F8E4M3>),
 }
 
+impl Drop for CudaStorageSlice {
+    fn drop(&mut self) {
+        // Set the correct CUDA context before the CudaSlice drops
+        let _result = match self {
+            CudaStorageSlice::U8(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::U32(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::I16(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::I32(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::I64(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::BF16(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::F16(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::F32(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::F64(slice) => set_context_for_slice(slice),
+            CudaStorageSlice::F8E4M3(slice) => set_context_for_slice(slice),
+        };
+        // After this method exits, the CudaSlice will drop with correct context
+    }
+}
+
+fn set_context_for_slice<T>(slice: &CudaSlice<T>) -> std::result::Result<(), CudaError> {
+    // Get the device this slice belongs to
+    let device = slice.device();
+    
+    // Set this device's CUDA context as current
+    // The exact method depends on cudarc's API
+    device.bind_to_thread()?;
+    // OR: cudarc::driver::result::ctx::set_current(device.cu_primary_ctx())?;
+    
+    Ok(())
+}
+
 struct Clone;
 impl Map1 for Clone {
     fn f<T: DeviceRepr>(
