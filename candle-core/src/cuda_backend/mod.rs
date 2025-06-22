@@ -1056,7 +1056,7 @@ pub struct CudaStorage {
     pub device: CudaDevice,
 }
 
-pub trait CudaDType: Sized {
+pub trait CudaDType: Sized + WithDType {
     fn as_cuda_slice(s: &CudaStorage) -> Result<&CudaSlice<Self>>;
     fn wrap_cuda_slice(s: CudaSlice<Self>, dev: CudaDevice) -> CudaStorage;
 }
