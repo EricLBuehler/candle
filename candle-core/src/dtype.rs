@@ -107,6 +107,192 @@ impl DType {
     }
 }
 
+// Real impl
+#[cfg(feature = "cuda")]
+mod allocated_buffers {
+    use cudarc::driver::{CudaSlice, DeviceRepr};
+    use float8::F8E4M3;
+    use half::{bf16, f16};
+
+    #[derive(Default)]
+    pub struct AllocatedBuffers {
+        buf_f8e4m3: Vec<CudaSlice<F8E4M3>>,
+        buf_u8: Vec<CudaSlice<u8>>,
+        buf_u32: Vec<CudaSlice<u32>>,
+        buf_i16: Vec<CudaSlice<i16>>,
+        buf_i32: Vec<CudaSlice<i32>>,
+        buf_i64: Vec<CudaSlice<i64>>,
+        buf_bf16: Vec<CudaSlice<bf16>>,
+        buf_f16: Vec<CudaSlice<f16>>,
+        buf_f32: Vec<CudaSlice<f32>>,
+        buf_f64: Vec<CudaSlice<f64>>,
+    }
+
+    // Trait to map from T to the correct buffer.
+    pub trait CachedBufferHelper: DeviceRepr {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>>
+        where
+            Self: Sized;
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>)
+        where
+            Self: Sized;
+    }
+
+    impl CachedBufferHelper for F8E4M3 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_f8e4m3
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_f8e4m3.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for u8 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_u8
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_u8.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for u32 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_u32
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_u32.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for i16 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_i16
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_i16.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for i32 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_i32
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_i32.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for i64 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_i64
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_i64.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for bf16 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_bf16
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_bf16.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for f16 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_f16
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_f16.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for f32 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_f32
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_f32.push(buf);
+        }
+    }
+
+    impl CachedBufferHelper for f64 {
+        fn get_buffers(buffers: &AllocatedBuffers) -> &Vec<CudaSlice<Self>> {
+            &buffers.buf_f64
+        }
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: CudaSlice<Self>) {
+            buffers.buf_f64.push(buf);
+        }
+    }
+}
+
+// Dummy impl
+#[cfg(not(feature = "cuda"))]
+mod allocated_buffers {
+    #[derive(Default)]
+    pub struct AllocatedBuffers;
+
+    pub trait CachedBufferHelper: DeviceRepr {
+        fn get_buffers(buffers: &AllocatedBuffers);
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ());
+    }
+
+    impl CachedBufferHelper for F8E4M3 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for u8 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for u32 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for i16 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for i32 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for i64 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for bf16 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for f16 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for f32 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+
+    impl CachedBufferHelper for f64 {
+        fn get_buffers(buffers: &AllocatedBuffers) {}
+        fn cache_buffer(buffers: &mut AllocatedBuffers, buf: ()) {}
+    }
+}
+
+pub use allocated_buffers::*;
+
 pub trait WithDType:
     Sized
     + Copy
@@ -118,6 +304,7 @@ pub trait WithDType:
     + Sync
     + std::any::Any
     + crate::cpu::kernels::VecOps
+    + CachedBufferHelper
 {
     const DTYPE: DType;
 

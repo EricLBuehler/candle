@@ -1,8 +1,11 @@
 use crate::backend::BackendDevice;
-use crate::{CpuStorage, CpuStorageRef, DType, Layout, Result, Shape};
+use crate::dtype::AllocatedBuffers;
+use crate::{CpuStorage, CpuStorageRef, DType, Layout, Result, Shape, WithDType};
 pub use candle_kernels as kernels;
 pub use cudarc;
-use cudarc::driver::{CudaFunction, LaunchAsync, LaunchConfig};
+use cudarc::driver::{
+    result, CudaFunction, CudaSlice, DeviceRepr, DeviceSlice, LaunchAsync, LaunchConfig,
+};
 use float8::F8E4M3;
 use half::{bf16, f16};
 use std::sync::{Arc, Mutex, RwLock};
@@ -32,6 +35,7 @@ pub struct CudaDevice {
     pub(crate) blas: Arc<cudarc::cublas::CudaBlas>,
     curand: Arc<Mutex<CudaRng>>,
     seed_value: Arc<RwLock<u64>>,
+    buffers: Arc<RwLock<AllocatedBuffers>>,
 }
 
 impl std::fmt::Debug for CudaDevice {
@@ -49,6 +53,29 @@ impl std::ops::Deref for CudaDevice {
 }
 
 impl CudaDevice {
+    /// Allocates device memory and increments the reference counter of [CudaDevice].
+    ///
+    /// # Safety
+    /// This is unsafe because the device memory is unset after this call.
+    pub unsafe fn alloc<T: DeviceRepr + WithDType>(
+        &self,
+        len: usize,
+    ) -> std::result::Result<CudaSlice<T>, result::DriverError> {
+        let mut buffers = self.buffers.write().unwrap();
+
+        let bufs = T::get_buffers(&*buffers);
+        for buf in bufs {
+            if buf.len() == len {
+                return Ok(buf.clone());
+            }
+        }
+
+        // Default to plain
+        let buffer = self.device.alloc::<T>(len)?;
+        T::cache_buffer(&mut buffers, buffer.clone());
+        Ok(buffer)
+    }
+
     pub fn cublas_handle(&self) -> &cudarc::cublas::CudaBlas {
         &*self.blas
     }
@@ -185,6 +212,7 @@ impl CudaDevice {
             blas: Arc::new(blas),
             curand: Arc::new(Mutex::new(CudaRng(curand))),
             seed_value: Arc::new(RwLock::new(299792458)),
+            buffers: Arc::new(RwLock::new(AllocatedBuffers::default())),
         })
     }
 }
@@ -202,6 +230,7 @@ impl BackendDevice for CudaDevice {
             blas: Arc::new(blas),
             curand: Arc::new(Mutex::new(CudaRng(curand))),
             seed_value: Arc::new(RwLock::new(299792458)),
+            buffers: Arc::new(RwLock::new(AllocatedBuffers::default())),
         })
     }
 
