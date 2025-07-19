@@ -167,7 +167,9 @@ impl crate::CustomOp1 for ArgSort {
                     DType::I64 => "asort_asc_i64",
                     DType::F8E4M3 => "asort_asc_f8e4m3",
                     DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
-                        return Err(crate::Error::UnsupportedDTypeForOp(storage.dtype(), "argsort").bt())
+                        return Err(
+                            crate::Error::UnsupportedDTypeForOp(storage.dtype(), "argsort").bt(),
+                        )
                     }
                 }
             } else {
@@ -183,7 +185,9 @@ impl crate::CustomOp1 for ArgSort {
                     DType::I64 => "asort_desc_i64",
                     DType::F8E4M3 => "asort_desc_f8e4m3",
                     DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
-                        return Err(crate::Error::UnsupportedDTypeForOp(storage.dtype(), "argsort").bt())
+                        return Err(
+                            crate::Error::UnsupportedDTypeForOp(storage.dtype(), "argsort").bt(),
+                        )
                     }
                 }
             }

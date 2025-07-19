@@ -267,9 +267,8 @@ fn convert_dummy(view: &st::TensorView<'_>, device: &Device) -> Result<Tensor> {
     };
 
     eprintln!(
-        "WARNING: Loading dummy type {} as u8. These are experimental floating-point formats \
-         that are not yet fully implemented. The data will be preserved but type information is lost.",
-        dtype_name
+        "WARNING: Loading dummy type {dtype_name} as u8. These are experimental floating-point formats \
+         that are not yet fully implemented. The data will be preserved but type information is lost."
     );
 
     // Load as u8 to preserve the raw bytes
@@ -280,10 +279,9 @@ fn create_dummy_tensor(dtype: DType, _shape: &[usize], _device: &Device) -> Resu
     // For dummy types loaded from raw buffers, return an error
     // This is less common than loading from safetensors files
     Err(Error::Msg(format!(
-        "Cannot create tensor from raw buffer with dummy type {:?}. \
+        "Cannot create tensor from raw buffer with dummy type {dtype:?}. \
          These are experimental floating-point formats that are not yet implemented. \
-         Consider loading from a safetensors file instead.",
-        dtype
+         Consider loading from a safetensors file instead."
     )))
 }
 

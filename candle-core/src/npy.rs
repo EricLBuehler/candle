@@ -113,7 +113,7 @@ impl Header {
         let mut parts: Vec<String> = vec![];
         let mut start_index = 0usize;
         let mut cnt_parenthesis = 0i64;
-        for (index, c) in header.chars().enumerate() {
+        for (index, c) in header.char_indices() {
             match c {
                 '(' => cnt_parenthesis += 1,
                 ')' => cnt_parenthesis -= 1,
@@ -259,10 +259,8 @@ impl Tensor {
             DType::F8E4M3 => {
                 let mut data_t = vec![0u8; elem_count];
                 reader.read_exact(&mut data_t)?;
-                let data_f8: Vec<float8::F8E4M3> = data_t
-                    .into_iter()
-                    .map(|b| float8::F8E4M3::from_bits(b))
-                    .collect();
+                let data_f8: Vec<float8::F8E4M3> =
+                    data_t.into_iter().map(float8::F8E4M3::from_bits).collect();
                 Tensor::from_vec(data_f8, shape, &Device::Cpu)
             }
             DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
