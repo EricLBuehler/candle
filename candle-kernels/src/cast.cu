@@ -139,3 +139,4 @@ CAST_OP(double, uint32_t, cast_f64_u32)
 CAST_OP(double, int64_t,  cast_f64_i64 )
 CAST_OP(double, float,    cast_f64_f32)
 CAST_OP(double, double,   cast_f64_f64)
+
