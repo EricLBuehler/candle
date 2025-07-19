@@ -306,6 +306,14 @@ impl BackendDevice for CudaDevice {
                 let data = self.alloc_zeros::<u32>(elem_count)?;
                 CudaStorageSlice::U32(data)
             }
+            DType::I16 => {
+                let data = self.alloc_zeros::<i16>(elem_count)?;
+                CudaStorageSlice::I16(data)
+            }
+            DType::I32 => {
+                let data = self.alloc_zeros::<i32>(elem_count)?;
+                CudaStorageSlice::I32(data)
+            }
             DType::I64 => {
                 let data = self.alloc_zeros::<i64>(elem_count)?;
                 CudaStorageSlice::I64(data)
@@ -326,6 +334,14 @@ impl BackendDevice for CudaDevice {
                 let data = self.alloc_zeros::<f64>(elem_count)?;
                 CudaStorageSlice::F64(data)
             }
+            DType::F8E4M3 => {
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
+            }
+            DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                return Err(
+                    CudaError::InternalError("Dummy types not supported in CUDA backend").w(),
+                )
+            }
         };
         Ok(CudaStorage {
             slice,
@@ -339,13 +355,17 @@ impl BackendDevice for CudaDevice {
         let slice = match dtype {
             // TODO: Add support for F16 and BF16 though this is likely to require some upstream
             // cudarc changes.
-            DType::U8 | DType::U32 | DType::I64 | DType::F16 | DType::BF16 => {
-                Err(CudaError::UnsupportedDtype {
-                    dtype,
-                    op: "rand_uniform",
-                })
-                .w()?
-            }
+            DType::U8
+            | DType::U32
+            | DType::I16
+            | DType::I32
+            | DType::I64
+            | DType::F16
+            | DType::BF16 => Err(CudaError::UnsupportedDtype {
+                dtype,
+                op: "rand_uniform",
+            })
+            .w()?,
             DType::F32 => {
                 let mut data = unsafe { self.alloc::<f32>(elem_count)? };
                 curand.0.fill_with_uniform(&mut data).w()?;
@@ -355,6 +375,13 @@ impl BackendDevice for CudaDevice {
                 let mut data = unsafe { self.alloc::<f64>(elem_count)? };
                 curand.0.fill_with_uniform(&mut data).w()?;
                 CudaStorageSlice::F64(data)
+            }
+            DType::F8E4M3 | DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                Err(CudaError::UnsupportedDtype {
+                    dtype,
+                    op: "rand_uniform",
+                })
+                .w()?
             }
         };
         let slice = if lo == 0. && up == 1.0 {
@@ -383,13 +410,17 @@ impl BackendDevice for CudaDevice {
             elem_count
         };
         let slice = match dtype {
-            DType::U8 | DType::U32 | DType::I64 | DType::F16 | DType::BF16 => {
-                Err(CudaError::UnsupportedDtype {
-                    dtype,
-                    op: "rand_normal",
-                })
-                .w()?
-            }
+            DType::U8
+            | DType::U32
+            | DType::I16
+            | DType::I32
+            | DType::I64
+            | DType::F16
+            | DType::BF16 => Err(CudaError::UnsupportedDtype {
+                dtype,
+                op: "rand_normal",
+            })
+            .w()?,
             DType::F32 => {
                 let mut data = unsafe { self.alloc::<f32>(elem_count_round)? };
                 curand
@@ -402,6 +433,13 @@ impl BackendDevice for CudaDevice {
                 let mut data = unsafe { self.alloc::<f64>(elem_count_round)? };
                 curand.0.fill_with_normal(&mut data, mean, std).w()?;
                 CudaStorageSlice::F64(data)
+            }
+            DType::F8E4M3 | DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                Err(CudaError::UnsupportedDtype {
+                    dtype,
+                    op: "rand_normal",
+                })
+                .w()?
             }
         };
         Ok(CudaStorage {
@@ -420,6 +458,14 @@ impl BackendDevice for CudaDevice {
             DType::U32 => {
                 let data = self.alloc::<u32>(elem_count)?;
                 CudaStorageSlice::U32(data)
+            }
+            DType::I16 => {
+                let data = self.alloc::<i16>(elem_count)?;
+                CudaStorageSlice::I16(data)
+            }
+            DType::I32 => {
+                let data = self.alloc::<i32>(elem_count)?;
+                CudaStorageSlice::I32(data)
             }
             DType::I64 => {
                 let data = self.alloc::<i64>(elem_count)?;
@@ -441,6 +487,14 @@ impl BackendDevice for CudaDevice {
                 let data = self.alloc::<f64>(elem_count)?;
                 CudaStorageSlice::F64(data)
             }
+            DType::F8E4M3 => {
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
+            }
+            DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                return Err(
+                    CudaError::InternalError("Dummy types not supported in CUDA backend").w(),
+                )
+            }
         };
         Ok(CudaStorage {
             slice,
@@ -457,6 +511,14 @@ impl BackendDevice for CudaDevice {
             CpuStorageRef::U32(storage) => {
                 let data = self.memcpy_stod(storage)?;
                 CudaStorageSlice::U32(data)
+            }
+            CpuStorageRef::I16(storage) => {
+                let data = self.memcpy_stod(storage)?;
+                CudaStorageSlice::I16(data)
+            }
+            CpuStorageRef::I32(storage) => {
+                let data = self.memcpy_stod(storage)?;
+                CudaStorageSlice::I32(data)
             }
             CpuStorageRef::I64(storage) => {
                 let data = self.memcpy_stod(storage)?;
@@ -478,6 +540,9 @@ impl BackendDevice for CudaDevice {
                 let data = self.memcpy_stod(storage)?;
                 CudaStorageSlice::F64(data)
             }
+            CpuStorageRef::F8E4M3(_storage) => {
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
+            }
         };
         Ok(CudaStorage {
             slice,
@@ -494,6 +559,14 @@ impl BackendDevice for CudaDevice {
             CpuStorage::U32(storage) => {
                 let data = self.memcpy_stod(storage)?;
                 CudaStorageSlice::U32(data)
+            }
+            CpuStorage::I16(storage) => {
+                let data = self.memcpy_stod(storage)?;
+                CudaStorageSlice::I16(data)
+            }
+            CpuStorage::I32(storage) => {
+                let data = self.memcpy_stod(storage)?;
+                CudaStorageSlice::I32(data)
             }
             CpuStorage::I64(storage) => {
                 let data = self.memcpy_stod(storage)?;
@@ -514,6 +587,9 @@ impl BackendDevice for CudaDevice {
             CpuStorage::F64(storage) => {
                 let data = self.memcpy_stod(storage)?;
                 CudaStorageSlice::F64(data)
+            }
+            CpuStorage::F8E4M3(_storage) => {
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
             }
         };
         Ok(CudaStorage {
@@ -532,6 +608,14 @@ impl BackendDevice for CudaDevice {
                 let data = self.memcpy_stod(&storage)?;
                 CudaStorageSlice::U32(data)
             }
+            CpuStorage::I16(storage) => {
+                let data = self.memcpy_stod(&storage)?;
+                CudaStorageSlice::I16(data)
+            }
+            CpuStorage::I32(storage) => {
+                let data = self.memcpy_stod(&storage)?;
+                CudaStorageSlice::I32(data)
+            }
             CpuStorage::I64(storage) => {
                 let data = self.memcpy_stod(&storage)?;
                 CudaStorageSlice::I64(data)
@@ -551,6 +635,9 @@ impl BackendDevice for CudaDevice {
             CpuStorage::F64(storage) => {
                 let data = self.memcpy_stod(&storage)?;
                 CudaStorageSlice::F64(data)
+            }
+            CpuStorage::F8E4M3(_storage) => {
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
             }
         };
         Ok(CudaStorage {

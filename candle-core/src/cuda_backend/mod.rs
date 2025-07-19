@@ -1561,10 +1561,9 @@ impl BackendStorage for CudaStorage {
                 let cpu_storage = slice.stream().memcpy_dtov(slice).w()?;
                 Ok(CpuStorage::F64(cpu_storage))
             }
-            CudaStorageSlice::F8E4M3(slice) => {
-                let cpu_storage = slice.stream().memcpy_dtov(slice).w()?;
-                Ok(CpuStorage::F8E4M3(cpu_storage))
-            }
+            CudaStorageSlice::F8E4M3(_slice) => Err(CudaError::InternalError(
+                "to_cpu_storage not supported for f8e4m3",
+            ))?,
         }
     }
 
@@ -2073,8 +2072,8 @@ impl BackendStorage for CudaStorage {
             (S::F16(s), S::F16(d)) => (slice_ptr(s, src_o), slice_ptr(d, dst_o), "copy2d_f16"),
             (S::F32(s), S::F32(d)) => (slice_ptr(s, src_o), slice_ptr(d, dst_o), "copy2d_f32"),
             (S::F64(s), S::F64(d)) => (slice_ptr(s, src_o), slice_ptr(d, dst_o), "copy2d_f64"),
-            (S::F8E4M3(s), S::F8E4M3(d)) => {
-                (slice_ptr(s, src_o), slice_ptr(d, dst_o), "copy2d_f8e4m3")
+            (S::F8E4M3(_s), S::F8E4M3(_d)) => {
+                Err(CudaError::InternalError("copy2d not supported for f8e4m3"))?
             }
             _ => Err(CudaError::InternalError("dtype mismatch in copy2d"))?,
         };
