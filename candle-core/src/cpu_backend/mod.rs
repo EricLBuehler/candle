@@ -2939,10 +2939,16 @@ impl BackendDevice for CpuDevice {
         let elem_count = shape.elem_count();
         let mut rng = rand::rng();
         match dtype {
-            DType::U8 | DType::U32 | DType::I16 | DType::I32 | DType::I64 | DType::F8E4M3
-            | DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
-                Err(Error::UnsupportedDTypeForOp(dtype, "rand_uniform").bt())
-            }
+            DType::U8
+            | DType::U32
+            | DType::I16
+            | DType::I32
+            | DType::I64
+            | DType::F8E4M3
+            | DType::F6E2M3
+            | DType::F6E3M2
+            | DType::F4
+            | DType::F8E8M0 => Err(Error::UnsupportedDTypeForOp(dtype, "rand_uniform").bt()),
             DType::BF16 => {
                 let mut data = Vec::with_capacity(elem_count);
                 let uniform = rand::distr::Uniform::new(bf16::from_f64(min), bf16::from_f64(max))
@@ -2987,10 +2993,16 @@ impl BackendDevice for CpuDevice {
         let elem_count = shape.elem_count();
         let mut rng = rand::rng();
         match dtype {
-            DType::U8 | DType::U32 | DType::I16 | DType::I32 | DType::I64 | DType::F8E4M3
-            | DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
-                Err(Error::UnsupportedDTypeForOp(dtype, "rand_normal").bt())
-            }
+            DType::U8
+            | DType::U32
+            | DType::I16
+            | DType::I32
+            | DType::I64
+            | DType::F8E4M3
+            | DType::F6E2M3
+            | DType::F6E3M2
+            | DType::F4
+            | DType::F8E8M0 => Err(Error::UnsupportedDTypeForOp(dtype, "rand_normal").bt()),
             DType::BF16 => {
                 let mut data = Vec::with_capacity(elem_count);
                 let normal = rand_distr::Normal::new(bf16::from_f64(mean), bf16::from_f64(std))

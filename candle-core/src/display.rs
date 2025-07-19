@@ -65,7 +65,12 @@ impl std::fmt::Debug for Tensor {
             DType::F64 => self.fmt_dt::<f64>(f),
             DType::F8E4M3 => self.fmt_dt::<float8::F8E4M3>(f),
             DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
-                write!(f, "Tensor[{:?}; dtype={}, unsupported dummy type]", self.shape(), self.dtype().as_str())
+                write!(
+                    f,
+                    "Tensor[{:?}; dtype={}, unsupported dummy type]",
+                    self.shape(),
+                    self.dtype().as_str()
+                )
             }
         }
     }
@@ -524,7 +529,11 @@ impl std::fmt::Display for Tensor {
                 }
             }
             DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
-                writeln!(f, "Dummy type {} (not supported for display)", self.dtype().as_str())?;
+                writeln!(
+                    f,
+                    "Dummy type {} (not supported for display)",
+                    self.dtype().as_str()
+                )?;
             }
         };
 
