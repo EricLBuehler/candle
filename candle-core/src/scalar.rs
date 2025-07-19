@@ -37,6 +37,9 @@ impl Scalar {
             DType::F32 => Scalar::F32(0.0),
             DType::F64 => Scalar::F64(0.0),
             DType::F8E4M3 => Scalar::F8E4M3(f8e4m3::ZERO),
+            DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                panic!("Cannot create zero scalar for dummy type {:?}", dtype)
+            }
         }
     }
 
@@ -52,6 +55,9 @@ impl Scalar {
             DType::F32 => Scalar::F32(1.0),
             DType::F64 => Scalar::F64(1.0),
             DType::F8E4M3 => Scalar::F8E4M3(f8e4m3::ONE),
+            DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                panic!("Cannot create one scalar for dummy type {:?}", dtype)
+            }
         }
     }
 

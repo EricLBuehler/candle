@@ -2163,6 +2163,10 @@ impl BackendStorage for CpuStorage {
                 let data = unary_map(storage, layout, |v| f8e4m3::from_f32(v as f32));
                 Ok(Self::F8E4M3(data))
             }
+            // Dummy types - return error for all conversions
+            (_, DType::F6E2M3) | (_, DType::F6E3M2) | (_, DType::F4) | (_, DType::F8E8M0) => {
+                Err(Error::UnsupportedDTypeForOp(dtype, "to_dtype").bt())
+            }
         }
     }
 
@@ -2935,7 +2939,8 @@ impl BackendDevice for CpuDevice {
         let elem_count = shape.elem_count();
         let mut rng = rand::rng();
         match dtype {
-            DType::U8 | DType::U32 | DType::I16 | DType::I32 | DType::I64 | DType::F8E4M3 => {
+            DType::U8 | DType::U32 | DType::I16 | DType::I32 | DType::I64 | DType::F8E4M3
+            | DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
                 Err(Error::UnsupportedDTypeForOp(dtype, "rand_uniform").bt())
             }
             DType::BF16 => {
@@ -2982,7 +2987,8 @@ impl BackendDevice for CpuDevice {
         let elem_count = shape.elem_count();
         let mut rng = rand::rng();
         match dtype {
-            DType::U8 | DType::U32 | DType::I16 | DType::I32 | DType::I64 | DType::F8E4M3 => {
+            DType::U8 | DType::U32 | DType::I16 | DType::I32 | DType::I64 | DType::F8E4M3
+            | DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
                 Err(Error::UnsupportedDTypeForOp(dtype, "rand_normal").bt())
             }
             DType::BF16 => {
@@ -3081,6 +3087,9 @@ impl BackendDevice for CpuDevice {
                 v.set_len(elem_count);
                 CpuStorage::F8E4M3(v)
             }
+            DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                return Err(Error::UnsupportedDTypeForOp(dtype, "alloc_uninit").bt())
+            }
         };
         Ok(storage)
     }
@@ -3098,6 +3107,9 @@ impl BackendDevice for CpuDevice {
             DType::F32 => CpuStorage::F32(vec![0f32; elem_count]),
             DType::F64 => CpuStorage::F64(vec![0f64; elem_count]),
             DType::F8E4M3 => CpuStorage::F8E4M3(vec![f8e4m3::ZERO; elem_count]),
+            DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                return Err(Error::UnsupportedDTypeForOp(dtype, "zeros").bt())
+            }
         };
         Ok(storage)
     }

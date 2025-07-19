@@ -61,6 +61,7 @@ mod custom_op;
 mod device;
 pub mod display;
 mod dtype;
+pub mod dummy_dtype;
 pub mod dummy_cuda_backend;
 mod dummy_metal_backend;
 pub mod error;

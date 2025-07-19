@@ -29,6 +29,10 @@ impl From<DType> for st::Dtype {
             DType::F32 => st::Dtype::F32,
             DType::F64 => st::Dtype::F64,
             DType::F8E4M3 => st::Dtype::F8_E4M3,
+            DType::F6E2M3 => st::Dtype::F6_E2M3,
+            DType::F6E3M2 => st::Dtype::F6_E3M2,
+            DType::F4 => st::Dtype::F4,
+            DType::F8E8M0 => st::Dtype::F8_E8M0,
         }
     }
 }
@@ -47,6 +51,10 @@ impl TryFrom<st::Dtype> for DType {
             st::Dtype::F32 => Ok(DType::F32),
             st::Dtype::F64 => Ok(DType::F64),
             st::Dtype::F8_E4M3 => Ok(DType::F8E4M3),
+            st::Dtype::F6_E2M3 => Ok(DType::F6E2M3),
+            st::Dtype::F6_E3M2 => Ok(DType::F6E3M2),
+            st::Dtype::F4 => Ok(DType::F4),
+            st::Dtype::F8_E8M0 => Ok(DType::F8E8M0),
             dtype => Err(Error::UnsupportedSafeTensorDtype(dtype)),
         }
     }
@@ -97,7 +105,7 @@ impl st::View for &Tensor {
 impl Tensor {
     pub fn save_safetensors<P: AsRef<Path>>(&self, name: &str, filename: P) -> Result<()> {
         let data = [(name, self.clone())];
-        Ok(st::serialize_to_file(data, &None, filename.as_ref())?)
+        Ok(st::serialize_to_file(data, None, filename.as_ref())?)
     }
 }
 
@@ -212,6 +220,10 @@ impl Tensor {
             DType::F32 => convert_slice::<f32>(data, shape, device),
             DType::F64 => convert_slice::<f64>(data, shape, device),
             DType::F8E4M3 => convert_slice::<float8::F8E4M3>(data, shape, device),
+            DType::F6E2M3 => Err(Error::UnsupportedDTypeForOp(DType::F6E2M3, "from_raw_buffer").bt()),
+            DType::F6E3M2 => Err(Error::UnsupportedDTypeForOp(DType::F6E3M2, "from_raw_buffer").bt()),
+            DType::F4 => Err(Error::UnsupportedDTypeForOp(DType::F4, "from_raw_buffer").bt()),
+            DType::F8E8M0 => Err(Error::UnsupportedDTypeForOp(DType::F8E8M0, "from_raw_buffer").bt()),
         }
     }
 }
@@ -250,6 +262,10 @@ fn convert_back(tensor: &Tensor) -> Result<Vec<u8>> {
         DType::F32 => Ok(convert_back_::<f32>(tensor.to_vec1()?)),
         DType::F64 => Ok(convert_back_::<f64>(tensor.to_vec1()?)),
         DType::F8E4M3 => Ok(convert_back_::<float8::F8E4M3>(tensor.to_vec1()?)),
+        DType::F6E2M3 => Err(Error::UnsupportedDTypeForOp(DType::F6E2M3, "convert_back").bt()),
+        DType::F6E3M2 => Err(Error::UnsupportedDTypeForOp(DType::F6E3M2, "convert_back").bt()),
+        DType::F4 => Err(Error::UnsupportedDTypeForOp(DType::F4, "convert_back").bt()),
+        DType::F8E8M0 => Err(Error::UnsupportedDTypeForOp(DType::F8E8M0, "convert_back").bt()),
     }
 }
 
@@ -270,7 +286,7 @@ pub fn save<K: AsRef<str> + Ord + std::fmt::Display, P: AsRef<Path>>(
     tensors: &HashMap<K, Tensor>,
     filename: P,
 ) -> Result<()> {
-    Ok(st::serialize_to_file(tensors, &None, filename.as_ref())?)
+    Ok(st::serialize_to_file(tensors, None, filename.as_ref())?)
 }
 
 #[derive(yoke::Yokeable)]

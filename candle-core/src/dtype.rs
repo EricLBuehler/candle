@@ -26,6 +26,11 @@ pub enum DType {
     F64,
     // 8-bit floating point with 4-bit exponent and 3-bit mantissa.
     F8E4M3,
+    // Dummy types for experimental formats
+    F6E2M3,
+    F6E3M2,
+    F4,
+    F8E8M0,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -53,6 +58,10 @@ impl std::str::FromStr for DType {
             "f32" => Ok(Self::F32),
             "f64" => Ok(Self::F64),
             "f8e4m3" => Ok(Self::F8E4M3),
+            "f6e2m3" => Ok(Self::F6E2M3),
+            "f6e3m2" => Ok(Self::F6E3M2),
+            "f4" => Ok(Self::F4),
+            "f8e8m0" => Ok(Self::F8E8M0),
             _ => Err(DTypeParseError(s.to_string())),
         }
     }
@@ -72,6 +81,10 @@ impl DType {
             Self::F32 => "f32",
             Self::F64 => "f64",
             Self::F8E4M3 => "f8e4m3",
+            Self::F6E2M3 => "f6e2m3",
+            Self::F6E3M2 => "f6e3m2",
+            Self::F4 => "f4",
+            Self::F8E8M0 => "f8e8m0",
         }
     }
 
@@ -88,20 +101,40 @@ impl DType {
             Self::F32 => 4,
             Self::F64 => 8,
             Self::F8E4M3 => 1,
+            Self::F6E2M3 => 1,  // 6 bits, rounded up to 1 byte
+            Self::F6E3M2 => 1,  // 6 bits, rounded up to 1 byte
+            Self::F4 => 1,      // 4 bits, rounded up to 1 byte
+            Self::F8E8M0 => 1,  // 8 bits = 1 byte
         }
     }
 
     pub fn is_int(&self) -> bool {
         match self {
             Self::U8 | Self::U32 | Self::I16 | Self::I32 | Self::I64 => true,
-            Self::BF16 | Self::F16 | Self::F32 | Self::F64 | Self::F8E4M3 => false,
+            Self::BF16
+            | Self::F16
+            | Self::F32
+            | Self::F64
+            | Self::F8E4M3
+            | Self::F6E2M3
+            | Self::F6E3M2
+            | Self::F4
+            | Self::F8E8M0 => false,
         }
     }
 
     pub fn is_float(&self) -> bool {
         match self {
             Self::U8 | Self::U32 | Self::I16 | Self::I32 | Self::I64 => false,
-            Self::BF16 | Self::F16 | Self::F32 | Self::F64 | Self::F8E4M3 => true,
+            Self::BF16
+            | Self::F16
+            | Self::F32
+            | Self::F64
+            | Self::F8E4M3
+            | Self::F6E2M3
+            | Self::F6E3M2
+            | Self::F4
+            | Self::F8E8M0 => true,
         }
     }
 }
