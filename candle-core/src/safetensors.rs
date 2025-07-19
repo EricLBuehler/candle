@@ -26,6 +26,7 @@ impl From<DType> for st::Dtype {
             DType::F16 => st::Dtype::F16,
             DType::F32 => st::Dtype::F32,
             DType::F64 => st::Dtype::F64,
+            DType::F8E4M3 => st::Dtype::F8_E4M3,
         }
     }
 }
@@ -41,6 +42,7 @@ impl TryFrom<st::Dtype> for DType {
             st::Dtype::F16 => Ok(DType::F16),
             st::Dtype::F32 => Ok(DType::F32),
             st::Dtype::F64 => Ok(DType::F64),
+            st::Dtype::F8_E4M3 => Ok(DType::F8E4M3),
             dtype => Err(Error::UnsupportedSafeTensorDtype(dtype)),
         }
     }
@@ -203,6 +205,7 @@ impl Tensor {
             DType::F16 => convert_slice::<half::f16>(data, shape, device),
             DType::F32 => convert_slice::<f32>(data, shape, device),
             DType::F64 => convert_slice::<f64>(data, shape, device),
+            DType::F8E4M3 => convert_slice::<float8::F8E4M3>(data, shape, device),
         }
     }
 }
@@ -224,6 +227,7 @@ fn convert(view: &st::TensorView<'_>, device: &Device) -> Result<Tensor> {
         st::Dtype::F16 => convert_::<half::f16>(view, device),
         st::Dtype::F32 => convert_::<f32>(view, device),
         st::Dtype::F64 => convert_::<f64>(view, device),
+        st::Dtype::F8_E4M3 => convert_::<float8::F8E4M3>(view, device),
         dtype => Err(Error::UnsupportedSafeTensorDtype(dtype)),
     }
 }
@@ -239,6 +243,7 @@ fn convert_back(tensor: &Tensor) -> Result<Vec<u8>> {
         DType::BF16 => Ok(convert_back_::<half::bf16>(tensor.to_vec1()?)),
         DType::F32 => Ok(convert_back_::<f32>(tensor.to_vec1()?)),
         DType::F64 => Ok(convert_back_::<f64>(tensor.to_vec1()?)),
+        DType::F8E4M3 => Ok(convert_back_::<float8::F8E4M3>(tensor.to_vec1()?)),
     }
 }
 

@@ -156,6 +156,18 @@ impl VecOps for i64 {
     }
 }
 
+impl VecOps for float8::F8E4M3 {
+    #[inline(always)]
+    fn min(self, other: Self) -> Self {
+        Self::min(self, other)
+    }
+
+    #[inline(always)]
+    fn max(self, other: Self) -> Self {
+        Self::max(self, other)
+    }
+}
+
 #[inline(always)]
 pub fn par_for_each(n_threads: usize, func: impl Fn(usize) + Send + Sync) {
     if n_threads == 1 {

@@ -88,6 +88,7 @@ impl Header {
             DType::I64 => "i8",
             DType::U32 => "u4",
             DType::U8 => "u1",
+            DType::F8E4M3 => Err(Error::Npy("f8e4m3 is not supported".into()))?,
         };
         if !shape.is_empty() {
             shape.push(',')
@@ -238,6 +239,14 @@ impl Tensor {
                 let mut data_t = vec![0i64; elem_count];
                 reader.read_i64_into::<LittleEndian>(&mut data_t)?;
                 Tensor::from_vec(data_t, shape, &Device::Cpu)
+            }
+            DType::F8E4M3 => {
+                let mut data_t = vec![0u8; elem_count];
+                reader.read_exact(&mut data_t)?;
+                let data_f8: Vec<float8::F8E4M3> = data_t.into_iter()
+                    .map(|b| float8::F8E4M3::from_bits(b))
+                    .collect();
+                Tensor::from_vec(data_f8, shape, &Device::Cpu)
             }
         }
     }
