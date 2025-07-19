@@ -114,6 +114,8 @@ impl crate::CustomOp1 for ArgSort {
         let sort_indexes = match storage {
             crate::CpuStorage::U8(vs) => self.asort(vs, layout),
             crate::CpuStorage::U32(vs) => self.asort(vs, layout),
+            crate::CpuStorage::I16(vs) => self.asort(vs, layout),
+            crate::CpuStorage::I32(vs) => self.asort(vs, layout),
             crate::CpuStorage::I64(vs) => self.asort(vs, layout),
             crate::CpuStorage::BF16(vs) => self.asort(vs, layout),
             crate::CpuStorage::F16(vs) => self.asort(vs, layout),
@@ -160,6 +162,8 @@ impl crate::CustomOp1 for ArgSort {
                     DType::F64 => "asort_asc_f64",
                     DType::U8 => "asort_asc_u8",
                     DType::U32 => "asort_asc_u32",
+                    DType::I16 => "asort_asc_i16",
+                    DType::I32 => "asort_asc_i32",
                     DType::I64 => "asort_asc_i64",
                     DType::F8E4M3 => "asort_asc_f8e4m3",
                 }
@@ -171,6 +175,8 @@ impl crate::CustomOp1 for ArgSort {
                     DType::F64 => "asort_desc_f64",
                     DType::U8 => "asort_desc_u8",
                     DType::U32 => "asort_desc_u32",
+                    DType::I16 => "asort_desc_i16",
+                    DType::I32 => "asort_desc_i32",
                     DType::I64 => "asort_desc_i64",
                     DType::F8E4M3 => "asort_desc_f8e4m3",
                 }

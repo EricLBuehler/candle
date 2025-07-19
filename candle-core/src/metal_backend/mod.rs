@@ -98,6 +98,8 @@ impl BackendStorage for MetalStorage {
         match self.dtype {
             DType::U8 => Ok(CpuStorage::U8(self.to_cpu()?)),
             DType::U32 => Ok(CpuStorage::U32(self.to_cpu()?)),
+            DType::I16 => Ok(CpuStorage::I16(self.to_cpu()?)),
+            DType::I32 => Ok(CpuStorage::I32(self.to_cpu()?)),
             DType::I64 => Ok(CpuStorage::I64(self.to_cpu()?)),
             DType::F16 => Ok(CpuStorage::F16(self.to_cpu()?)),
             DType::BF16 => Ok(CpuStorage::BF16(self.to_cpu()?)),

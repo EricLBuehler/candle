@@ -85,6 +85,8 @@ impl Header {
             DType::F16 => "f2",
             DType::F32 => "f4",
             DType::F64 => "f8",
+            DType::I16 => "i2",
+            DType::I32 => "i4",
             DType::I64 => "i8",
             DType::U32 => "u4",
             DType::U8 => "u1",
@@ -161,9 +163,9 @@ impl Header {
                     "e" | "f2" => DType::F16,
                     "f" | "f4" => DType::F32,
                     "d" | "f8" => DType::F64,
-                    // "i" | "i4" => DType::S32,
+                    "i" | "i4" => DType::I32,
                     "q" | "i8" => DType::I64,
-                    // "h" | "i2" => DType::S16,
+                    "h" | "i2" => DType::I16,
                     // "b" | "i1" => DType::S8,
                     "B" | "u1" => DType::U8,
                     "I" | "u4" => DType::U32,
@@ -235,6 +237,16 @@ impl Tensor {
                 reader.read_u32_into::<LittleEndian>(&mut data_t)?;
                 Tensor::from_vec(data_t, shape, &Device::Cpu)
             }
+            DType::I16 => {
+                let mut data_t = vec![0i16; elem_count];
+                reader.read_i16_into::<LittleEndian>(&mut data_t)?;
+                Tensor::from_vec(data_t, shape, &Device::Cpu)
+            }
+            DType::I32 => {
+                let mut data_t = vec![0i32; elem_count];
+                reader.read_i32_into::<LittleEndian>(&mut data_t)?;
+                Tensor::from_vec(data_t, shape, &Device::Cpu)
+            }
             DType::I64 => {
                 let mut data_t = vec![0i64; elem_count];
                 reader.read_i64_into::<LittleEndian>(&mut data_t)?;
@@ -243,7 +255,8 @@ impl Tensor {
             DType::F8E4M3 => {
                 let mut data_t = vec![0u8; elem_count];
                 reader.read_exact(&mut data_t)?;
-                let data_f8: Vec<float8::F8E4M3> = data_t.into_iter()
+                let data_f8: Vec<float8::F8E4M3> = data_t
+                    .into_iter()
                     .map(|b| float8::F8E4M3::from_bits(b))
                     .collect();
                 Tensor::from_vec(data_f8, shape, &Device::Cpu)
