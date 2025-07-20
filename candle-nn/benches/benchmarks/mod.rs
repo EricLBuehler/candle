@@ -2,6 +2,8 @@ pub(crate) mod conv;
 pub(crate) mod layer_norm;
 pub(crate) mod softmax;
 
+#[cfg(feature = "cuda")]
+use candle::backend::BackendDevice;
 use candle::{Device, Result};
 
 pub(crate) trait BenchDevice {
