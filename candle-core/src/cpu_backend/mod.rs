@@ -29,6 +29,11 @@ pub enum CpuStorage {
     F32(Vec<f32>),
     F64(Vec<f64>),
     F8E4M3(Vec<f8e4m3>),
+    // Dummy types that store raw bytes
+    F6E2M3(Vec<u8>),
+    F6E3M2(Vec<u8>),
+    F4(Vec<u8>),
+    F8E8M0(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
@@ -43,6 +48,11 @@ pub enum CpuStorageRef<'a> {
     F32(&'a [f32]),
     F64(&'a [f64]),
     F8E4M3(&'a [f8e4m3]),
+    // Dummy types that store raw bytes
+    F6E2M3(&'a [u8]),
+    F6E3M2(&'a [u8]),
+    F4(&'a [u8]),
+    F8E8M0(&'a [u8]),
 }
 
 #[derive(Debug, Clone)]
@@ -1731,6 +1741,50 @@ impl CpuStorage {
                     .concat();
                 Self::F8E4M3(storages)
             }
+            Self::F6E2M3(_) => {
+                let storages = storages
+                    .iter()
+                    .map(|s| match s {
+                        Self::F6E2M3(s) => Ok(s.as_slice()),
+                        _ => crate::bail!("dtype mismatch"),
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .concat();
+                Self::F6E2M3(storages)
+            }
+            Self::F6E3M2(_) => {
+                let storages = storages
+                    .iter()
+                    .map(|s| match s {
+                        Self::F6E3M2(s) => Ok(s.as_slice()),
+                        _ => crate::bail!("dtype mismatch"),
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .concat();
+                Self::F6E3M2(storages)
+            }
+            Self::F4(_) => {
+                let storages = storages
+                    .iter()
+                    .map(|s| match s {
+                        Self::F4(s) => Ok(s.as_slice()),
+                        _ => crate::bail!("dtype mismatch"),
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .concat();
+                Self::F4(storages)
+            }
+            Self::F8E8M0(_) => {
+                let storages = storages
+                    .iter()
+                    .map(|s| match s {
+                        Self::F8E8M0(s) => Ok(s.as_slice()),
+                        _ => crate::bail!("dtype mismatch"),
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .concat();
+                Self::F8E8M0(storages)
+            }
         };
         Ok(s)
     }
@@ -1751,6 +1805,10 @@ impl BackendStorage for CpuStorage {
             Self::F32(_) => DType::F32,
             Self::F64(_) => DType::F64,
             Self::F8E4M3(_) => DType::F8E4M3,
+            Self::F6E2M3(_) => DType::F6E2M3,
+            Self::F6E3M2(_) => DType::F6E3M2,
+            Self::F4(_) => DType::F4,
+            Self::F8E8M0(_) => DType::F8E8M0,
         }
     }
 
@@ -2289,6 +2347,10 @@ impl BackendStorage for CpuStorage {
             Self::I16(_) => Err(Error::UnsupportedDTypeForOp(DType::I16, "powf").bt()),
             Self::I32(_) => Err(Error::UnsupportedDTypeForOp(DType::I32, "powf").bt()),
             Self::I64(_) => Err(Error::UnsupportedDTypeForOp(DType::I64, "powf").bt()),
+            Self::F6E2M3(_) => Err(Error::UnsupportedDTypeForOp(DType::F6E2M3, "powf").bt()),
+            Self::F6E3M2(_) => Err(Error::UnsupportedDTypeForOp(DType::F6E3M2, "powf").bt()),
+            Self::F4(_) => Err(Error::UnsupportedDTypeForOp(DType::F4, "powf").bt()),
+            Self::F8E8M0(_) => Err(Error::UnsupportedDTypeForOp(DType::F8E8M0, "powf").bt()),
         }
     }
 
@@ -2320,6 +2382,10 @@ impl BackendStorage for CpuStorage {
             Self::I16(_) => Err(Error::UnsupportedDTypeForOp(DType::I16, "elu").bt()),
             Self::I32(_) => Err(Error::UnsupportedDTypeForOp(DType::I32, "elu").bt()),
             Self::I64(_) => Err(Error::UnsupportedDTypeForOp(DType::I64, "elu").bt()),
+            Self::F6E2M3(_) => Err(Error::UnsupportedDTypeForOp(DType::F6E2M3, "elu").bt()),
+            Self::F6E3M2(_) => Err(Error::UnsupportedDTypeForOp(DType::F6E3M2, "elu").bt()),
+            Self::F4(_) => Err(Error::UnsupportedDTypeForOp(DType::F4, "elu").bt()),
+            Self::F8E8M0(_) => Err(Error::UnsupportedDTypeForOp(DType::F8E8M0, "elu").bt()),
         }
     }
 
@@ -2385,6 +2451,10 @@ impl BackendStorage for CpuStorage {
                 let data = unary_map(storage, layout, B::f8e4m3);
                 Ok(Self::F8E4M3(data))
             }
+            Self::F6E2M3(_) => Err(Error::UnsupportedDTypeForOp(DType::F6E2M3, "unary").bt()),
+            Self::F6E3M2(_) => Err(Error::UnsupportedDTypeForOp(DType::F6E3M2, "unary").bt()),
+            Self::F4(_) => Err(Error::UnsupportedDTypeForOp(DType::F4, "unary").bt()),
+            Self::F8E8M0(_) => Err(Error::UnsupportedDTypeForOp(DType::F8E8M0, "unary").bt()),
         }
     }
 
@@ -2514,6 +2584,16 @@ impl BackendStorage for CpuStorage {
             (Self::F8E4M3(src), Self::F8E4M3(dst)) => {
                 copy2d_(src, dst, d1, d2, src_s, dst_s, src_o, dst_o)
             }
+            (Self::F6E2M3(src), Self::F6E2M3(dst)) => {
+                copy2d_(src, dst, d1, d2, src_s, dst_s, src_o, dst_o)
+            }
+            (Self::F6E3M2(src), Self::F6E3M2(dst)) => {
+                copy2d_(src, dst, d1, d2, src_s, dst_s, src_o, dst_o)
+            }
+            (Self::F4(src), Self::F4(dst)) => copy2d_(src, dst, d1, d2, src_s, dst_s, src_o, dst_o),
+            (Self::F8E8M0(src), Self::F8E8M0(dst)) => {
+                copy2d_(src, dst, d1, d2, src_s, dst_s, src_o, dst_o)
+            }
             (_, dst) => {
                 return Err(Error::DTypeMismatchBinaryOp {
                     lhs: self.dtype(),
@@ -2538,6 +2618,16 @@ impl BackendStorage for CpuStorage {
             (Self::F32(src), Self::F32(dst)) => copy_strided_src_(src, dst, dst_offset, src_l),
             (Self::F64(src), Self::F64(dst)) => copy_strided_src_(src, dst, dst_offset, src_l),
             (Self::F8E4M3(src), Self::F8E4M3(dst)) => {
+                copy_strided_src_(src, dst, dst_offset, src_l)
+            }
+            (Self::F6E2M3(src), Self::F6E2M3(dst)) => {
+                copy_strided_src_(src, dst, dst_offset, src_l)
+            }
+            (Self::F6E3M2(src), Self::F6E3M2(dst)) => {
+                copy_strided_src_(src, dst, dst_offset, src_l)
+            }
+            (Self::F4(src), Self::F4(dst)) => copy_strided_src_(src, dst, dst_offset, src_l),
+            (Self::F8E8M0(src), Self::F8E8M0(dst)) => {
                 copy_strided_src_(src, dst, dst_offset, src_l)
             }
             (_, dst) => {
@@ -2892,6 +2982,19 @@ impl BackendStorage for CpuStorage {
             (Self::I32(storage), Scalar::I32(v)) => set(storage, l, v),
             (Self::I64(storage), Scalar::I64(v)) => set(storage, l, v),
             (Self::F8E4M3(storage), Scalar::F8E4M3(v)) => set(storage, l, v),
+            // Dummy types don't support scalar operations
+            (Self::F6E2M3(_), _) => {
+                crate::bail!("const_set not supported for dummy type F6E2M3")
+            }
+            (Self::F6E3M2(_), _) => {
+                crate::bail!("const_set not supported for dummy type F6E3M2")
+            }
+            (Self::F4(_), _) => {
+                crate::bail!("const_set not supported for dummy type F4")
+            }
+            (Self::F8E8M0(_), _) => {
+                crate::bail!("const_set not supported for dummy type F8E8M0")
+            }
             (st, s) => crate::bail!(
                 "const_set dtype mismatch, expected {:?} but got {:?}",
                 st.dtype(),

@@ -252,6 +252,7 @@ impl CudaDevice {
             curand: Arc::new(Mutex::new(CudaRng(curand))),
             modules: Arc::new(std::sync::RwLock::new(module_store)),
             custom_modules: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            seed_value: Arc::new(RwLock::new(299792458)),
         })
     }
 }

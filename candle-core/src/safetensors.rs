@@ -9,6 +9,10 @@
 //! Tensors can also be serialized to safetensor format using the `save` function or
 //! `Tensor::save_safetensors` method.
 //!
+use crate::backend::BackpropOp;
+use crate::op::Op;
+use crate::storage::Storage;
+use crate::tensor::from_storage;
 use crate::{DType, Device, Error, Result, Tensor, WithDType};
 use safetensors::tensor as st;
 use safetensors::tensor::SafeTensors;
@@ -221,9 +225,34 @@ impl Tensor {
             DType::F64 => convert_slice::<f64>(data, shape, device),
             DType::F8E4M3 => convert_slice::<float8::F8E4M3>(data, shape, device),
             DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
-                // For dummy types, create a dummy tensor that matches the expected shape
-                // but doesn't contain real data
-                create_dummy_tensor(dtype, shape, device)
+                // For dummy types, create storage with raw bytes
+                let storage = match device {
+                    Device::Cpu => {
+                        let cpu_storage = match dtype {
+                            DType::F6E2M3 => crate::cpu_backend::CpuStorage::F6E2M3(data.to_vec()),
+                            DType::F6E3M2 => crate::cpu_backend::CpuStorage::F6E3M2(data.to_vec()),
+                            DType::F4 => crate::cpu_backend::CpuStorage::F4(data.to_vec()),
+                            DType::F8E8M0 => crate::cpu_backend::CpuStorage::F8E8M0(data.to_vec()),
+                            _ => unreachable!(),
+                        };
+                        Storage::Cpu(cpu_storage)
+                    }
+                    #[cfg(feature = "cuda")]
+                    Device::Cuda(_) => {
+                        return Err(Error::Msg(format!(
+                            "Dummy type {dtype:?} is not supported on CUDA devices"
+                        )));
+                    }
+                    #[cfg(feature = "metal")]
+                    Device::Metal(_) => {
+                        return Err(Error::Msg(format!(
+                            "Dummy type {dtype:?} is not supported on Metal devices"
+                        )));
+                    }
+                };
+
+                let op = BackpropOp::none();
+                Ok(from_storage(storage, shape, op, false))
             }
         }
     }
@@ -256,33 +285,49 @@ fn convert(view: &st::TensorView<'_>, device: &Device) -> Result<Tensor> {
 }
 
 fn convert_dummy(view: &st::TensorView<'_>, device: &Device) -> Result<Tensor> {
-    // For dummy types, we'll load them as u8 tensors to preserve the data
-    // and print a warning about the type conversion
-    let dtype_name = match view.dtype() {
-        st::Dtype::F6_E2M3 => "F6_E2M3 (MX6)",
-        st::Dtype::F6_E3M2 => "F6_E3M2 (MX6)",
-        st::Dtype::F4 => "F4 (MX4)",
-        st::Dtype::F8_E8M0 => "F8_E8M0",
+    // For dummy types, we'll create the appropriate storage variant that preserves
+    // both the raw data and the correct dtype
+    let (dtype, dtype_name) = match view.dtype() {
+        st::Dtype::F6_E2M3 => (DType::F6E2M3, "F6_E2M3 (MX6)"),
+        st::Dtype::F6_E3M2 => (DType::F6E3M2, "F6_E3M2 (MX6)"),
+        st::Dtype::F4 => (DType::F4, "F4 (MX4)"),
+        st::Dtype::F8_E8M0 => (DType::F8E8M0, "F8_E8M0"),
         _ => unreachable!("convert_dummy called with non-dummy dtype"),
     };
 
-    eprintln!(
-        "WARNING: Loading dummy type {dtype_name} as u8. These are experimental floating-point formats \
-         that are not yet fully implemented. The data will be preserved but type information is lost."
-    );
+    // Load the raw bytes
+    let data = view.data();
+    let shape = view.shape();
 
-    // Load as u8 to preserve the raw bytes
-    convert_::<u8>(view, device)
-}
+    // Create storage with the appropriate dummy type variant
+    let storage = match device {
+        Device::Cpu => {
+            let cpu_storage = match dtype {
+                DType::F6E2M3 => crate::cpu_backend::CpuStorage::F6E2M3(data.to_vec()),
+                DType::F6E3M2 => crate::cpu_backend::CpuStorage::F6E3M2(data.to_vec()),
+                DType::F4 => crate::cpu_backend::CpuStorage::F4(data.to_vec()),
+                DType::F8E8M0 => crate::cpu_backend::CpuStorage::F8E8M0(data.to_vec()),
+                _ => unreachable!(),
+            };
+            Storage::Cpu(cpu_storage)
+        }
+        #[cfg(feature = "cuda")]
+        Device::Cuda(_) => {
+            return Err(Error::Msg(format!(
+                "Dummy type {dtype_name} is not supported on CUDA devices"
+            )));
+        }
+        #[cfg(feature = "metal")]
+        Device::Metal(_) => {
+            return Err(Error::Msg(format!(
+                "Dummy type {dtype_name} is not supported on Metal devices"
+            )));
+        }
+    };
 
-fn create_dummy_tensor(dtype: DType, _shape: &[usize], _device: &Device) -> Result<Tensor> {
-    // For dummy types loaded from raw buffers, return an error
-    // This is less common than loading from safetensors files
-    Err(Error::Msg(format!(
-        "Cannot create tensor from raw buffer with dummy type {dtype:?}. \
-         These are experimental floating-point formats that are not yet implemented. \
-         Consider loading from a safetensors file instead."
-    )))
+    // Create tensor with correct dtype
+    let op = BackpropOp::none();
+    Ok(from_storage(storage, shape, op, false))
 }
 
 fn convert_back(tensor: &Tensor) -> Result<Vec<u8>> {
@@ -299,10 +344,33 @@ fn convert_back(tensor: &Tensor) -> Result<Vec<u8>> {
         DType::F32 => Ok(convert_back_::<f32>(tensor.to_vec1()?)),
         DType::F64 => Ok(convert_back_::<f64>(tensor.to_vec1()?)),
         DType::F8E4M3 => Ok(convert_back_::<float8::F8E4M3>(tensor.to_vec1()?)),
-        DType::F6E2M3 => Err(Error::UnsupportedDTypeForOp(DType::F6E2M3, "convert_back").bt()),
-        DType::F6E3M2 => Err(Error::UnsupportedDTypeForOp(DType::F6E3M2, "convert_back").bt()),
-        DType::F4 => Err(Error::UnsupportedDTypeForOp(DType::F4, "convert_back").bt()),
-        DType::F8E8M0 => Err(Error::UnsupportedDTypeForOp(DType::F8E8M0, "convert_back").bt()),
+        DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+            // For dummy types, extract the raw bytes from storage
+            let storage = tensor.storage();
+            let storage = storage
+                .read()
+                .map_err(|_| Error::Msg("Failed to lock storage".to_string()))?;
+
+            match &*storage {
+                Storage::Cpu(cpu_storage) => match cpu_storage {
+                    crate::cpu_backend::CpuStorage::F6E2M3(data)
+                    | crate::cpu_backend::CpuStorage::F6E3M2(data)
+                    | crate::cpu_backend::CpuStorage::F4(data)
+                    | crate::cpu_backend::CpuStorage::F8E8M0(data) => Ok(data.clone()),
+                    _ => Err(
+                        Error::Msg("Internal error: dtype mismatch in storage".to_string()).bt(),
+                    ),
+                },
+                #[cfg(feature = "cuda")]
+                Storage::Cuda(_) => {
+                    Err(Error::Msg("Dummy types are not supported on CUDA".to_string()).bt())
+                }
+                #[cfg(feature = "metal")]
+                Storage::Metal(_) => {
+                    Err(Error::Msg("Dummy types are not supported on Metal".to_string()).bt())
+                }
+            }
+        }
     }
 }
 
