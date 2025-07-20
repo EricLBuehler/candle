@@ -236,6 +236,16 @@ impl MetalDevice {
         let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
         self.allocate_buffer(size, MTLResourceOptions::StorageModePrivate, name)
     }
+    
+    pub fn new_buffer_private(
+        &self,
+        element_count: usize,
+        dtype: DType,
+        name: &str,
+    ) -> Result<Arc<Buffer>> {
+        let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
+        self.allocate_buffer(size, metal::MTLResourceOptions::StorageModePrivate, name)
+    }
 
     /// Creates a new buffer (not necessarily zeroed).
     /// The buffer is [MTLManaged](https://developer.apple.com/documentation/metal/mtlstoragemode)
