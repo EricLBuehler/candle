@@ -335,11 +335,11 @@ impl BackendDevice for CudaDevice {
                 CudaStorageSlice::F64(data)
             }
             DType::F8E4M3 => {
-                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").into())
             }
             DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
                 return Err(
-                    CudaError::InternalError("Dummy types not supported in CUDA backend").w(),
+                    CudaError::InternalError("Dummy types not supported in CUDA backend").into(),
                 )
             }
         };
@@ -488,11 +488,11 @@ impl BackendDevice for CudaDevice {
                 CudaStorageSlice::F64(data)
             }
             DType::F8E4M3 => {
-                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").into())
             }
             DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
                 return Err(
-                    CudaError::InternalError("Dummy types not supported in CUDA backend").w(),
+                    CudaError::InternalError("Dummy types not supported in CUDA backend").into(),
                 )
             }
         };
@@ -541,7 +541,7 @@ impl BackendDevice for CudaDevice {
                 CudaStorageSlice::F64(data)
             }
             CpuStorageRef::F8E4M3(_storage) => {
-                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").into())
             }
         };
         Ok(CudaStorage {
@@ -589,7 +589,7 @@ impl BackendDevice for CudaDevice {
                 CudaStorageSlice::F64(data)
             }
             CpuStorage::F8E4M3(_storage) => {
-                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").into())
             }
         };
         Ok(CudaStorage {
@@ -637,7 +637,7 @@ impl BackendDevice for CudaDevice {
                 CudaStorageSlice::F64(data)
             }
             CpuStorage::F8E4M3(_storage) => {
-                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").w())
+                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").into())
             }
         };
         Ok(CudaStorage {

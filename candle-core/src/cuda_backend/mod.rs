@@ -1469,6 +1469,14 @@ impl BackendStorage for CudaStorage {
                 unsafe { builder.launch(cfg) }.w()?;
                 CudaStorageSlice::F8E4M3(out)
             }
+            DType::I16 | DType::I32 => {
+                return Err(CudaError::InternalError("i16,i32 dtypes are not supported").into())
+            }
+            DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
+                return Err(
+                    CudaError::InternalError("Dummy types not supported in CUDA backend").into(),
+                )
+            }
         };
         Ok(Self {
             slice,

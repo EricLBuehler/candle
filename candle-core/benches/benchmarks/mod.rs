@@ -8,6 +8,8 @@ pub(crate) mod reduce;
 pub(crate) mod unary;
 pub(crate) mod where_cond;
 
+#[cfg(feature = "cuda")]
+use candle_core::backend::BackendDevice;
 use candle_core::{Device, Result};
 
 pub(crate) trait BenchDevice {

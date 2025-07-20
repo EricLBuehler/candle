@@ -2,6 +2,7 @@
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
     },
+    "rust-analyzer.cargo.features": ["cuda"],
     "python.formatting.provider": "none",
     "python.testing.pytestArgs": [
         "candle-pyo3"
