@@ -38,6 +38,8 @@ trait CpuF16<const ARR: usize> {
     unsafe fn from_f32(v: f32) -> Self::Unit;
     unsafe fn vec_store(mem_addr: *mut f16, a: Self::Unit);
 }
+#[cfg(not(target_feature = "avx"))]
+use half::bf16;
 use half::f16;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -146,6 +148,34 @@ pub(crate) unsafe fn vec_sum(row: *const f32, b: *mut f32, k: usize) {
 
 #[cfg(target_feature = "avx")]
 #[inline(always)]
+pub(crate) unsafe fn vec_dot_bf16(a_row: *const bf16, b_row: *const bf16, c: *mut f32, k: usize) {
+    let mut sumf = 0.0f32;
+    let np = k & !(CurrentCpuBF16::STEP - 1);
+
+    let mut sum = CurrentCpuBF16::zero_array();
+    let mut ax = CurrentCpuBF16::zero_array();
+    let mut ay = CurrentCpuBF16::zero_array();
+
+    for i in (0..np).step_by(CurrentCpuBF16::STEP) {
+        for j in 0..CurrentCpuBF16::n() {
+            ax[j] = CurrentCpuBF16::load(a_row.add(i + j * CurrentCpuBF16::EPR));
+            ay[j] = CurrentCpuBF16::load(b_row.add(i + j * CurrentCpuBF16::EPR));
+
+            sum[j] = CurrentCpuBF16::vec_fma(sum[j], ax[j], ay[j]);
+        }
+    }
+
+    CurrentCpuBF16::vec_reduce(sum, &mut sumf);
+
+    // leftovers
+    for i in np..k {
+        sumf += (*a_row.add(i)).to_f32() * (*b_row.add(i)).to_f32();
+    }
+    *c = sumf;
+}
+
+#[cfg(target_feature = "avx")]
+#[inline(always)]
 pub(crate) unsafe fn vec_dot_f16(a_row: *const f16, b_row: *const f16, c: *mut f32, k: usize) {
     let mut sumf = 0.0f32;
     let np = k & !(CurrentCpuF16::STEP - 1);
@@ -175,6 +205,17 @@ pub(crate) unsafe fn vec_dot_f16(a_row: *const f16, b_row: *const f16, c: *mut f
 #[cfg(not(target_feature = "avx"))]
 #[inline(always)]
 pub(crate) unsafe fn vec_dot_f16(a_row: *const f16, b_row: *const f16, c: *mut f32, k: usize) {
+    // leftovers
+    let mut sum = 0.0;
+    for i in 0..k {
+        sum += (*a_row.add(i)).to_f32() * (*b_row.add(i)).to_f32();
+    }
+    *c = sum;
+}
+
+#[cfg(not(target_feature = "avx"))]
+#[inline(always)]
+pub(crate) unsafe fn vec_dot_bf16(a_row: *const bf16, b_row: *const bf16, c: *mut f32, k: usize) {
     // leftovers
     let mut sum = 0.0;
     for i in 0..k {
