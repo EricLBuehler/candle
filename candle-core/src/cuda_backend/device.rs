@@ -245,6 +245,10 @@ impl CudaDevice {
             stream: self.stream.clone(),
         })
     }
+
+    pub fn cublas_handle(&self) -> Arc<cudarc::cublas::CudaBlas> {
+        self.blas.clone()
+    }
 }
 
 impl CudaDevice {
