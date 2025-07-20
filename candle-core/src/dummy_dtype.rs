@@ -6,18 +6,22 @@
 use crate::{DType, Error, Result, WithDType};
 
 /// 6-bit float with 2 exponent bits and 3 mantissa bits (MX6 format)
+/// This is a dummy type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct F6E2M3;
 
 /// 6-bit float with 3 exponent bits and 2 mantissa bits (MX6 format)
+/// This is a dummy type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct F6E3M2;
 
 /// 4-bit float (MX4 format)
+/// This is a dummy type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct F4;
 
 /// 8-bit float with 8 exponent bits and 0 mantissa bits
+/// This is a dummy type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct F8E8M0;
 

@@ -26,10 +26,13 @@ pub enum DType {
     F64,
     // 8-bit floating point with 4-bit exponent and 3-bit mantissa.
     F8E4M3,
-    // Dummy types for experimental formats
+    /// 6-bit float with 2 exponent bits and 3 mantissa bits (MX6 format)
     F6E2M3,
+    /// 6-bit float with 3 exponent bits and 2 mantissa bits (MX6 format)
     F6E3M2,
+    /// 4-bit float (MX4 format)
     F4,
+    /// 8-bit float with 8 exponent bits and 0 mantissa bits
     F8E8M0,
 }
 
