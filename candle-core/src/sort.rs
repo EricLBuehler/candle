@@ -122,6 +122,25 @@ impl crate::CustomOp1 for ArgSort {
             crate::CpuStorage::F32(vs) => self.asort(vs, layout),
             crate::CpuStorage::F64(vs) => self.asort(vs, layout),
             crate::CpuStorage::F8E4M3(vs) => self.asort(vs, layout),
+            // Dummy types don't support sorting
+            crate::CpuStorage::F6E2M3(_) => {
+                return Err(
+                    crate::Error::UnsupportedDTypeForOp(crate::DType::F6E2M3, "argsort").bt(),
+                )
+            }
+            crate::CpuStorage::F6E3M2(_) => {
+                return Err(
+                    crate::Error::UnsupportedDTypeForOp(crate::DType::F6E3M2, "argsort").bt(),
+                )
+            }
+            crate::CpuStorage::F4(_) => {
+                return Err(crate::Error::UnsupportedDTypeForOp(crate::DType::F4, "argsort").bt())
+            }
+            crate::CpuStorage::F8E8M0(_) => {
+                return Err(
+                    crate::Error::UnsupportedDTypeForOp(crate::DType::F8E8M0, "argsort").bt(),
+                )
+            }
         };
         let sort_indexes = crate::CpuStorage::U32(sort_indexes);
         Ok((sort_indexes, layout.shape().into()))

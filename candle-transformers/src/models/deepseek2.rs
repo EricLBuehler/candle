@@ -53,6 +53,25 @@ impl CustomOp1 for NonZero {
             candle::CpuStorage::F32(vs) => self.nonzero(vs, layout),
             candle::CpuStorage::F64(vs) => self.nonzero(vs, layout),
             candle::CpuStorage::F8E4M3(vs) => self.nonzero(vs, layout),
+            // Dummy types don't support nonzero operation
+            candle::CpuStorage::F6E2M3(_) => {
+                return Err(
+                    candle::Error::UnsupportedDTypeForOp(candle::DType::F6E2M3, "nonzero").bt(),
+                )
+            }
+            candle::CpuStorage::F6E3M2(_) => {
+                return Err(
+                    candle::Error::UnsupportedDTypeForOp(candle::DType::F6E3M2, "nonzero").bt(),
+                )
+            }
+            candle::CpuStorage::F4(_) => {
+                return Err(candle::Error::UnsupportedDTypeForOp(candle::DType::F4, "nonzero").bt())
+            }
+            candle::CpuStorage::F8E8M0(_) => {
+                return Err(
+                    candle::Error::UnsupportedDTypeForOp(candle::DType::F8E8M0, "nonzero").bt(),
+                )
+            }
         };
         let index_len = layout.dims().len();
         let result_len = result.len() / index_len;

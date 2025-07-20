@@ -2221,9 +2221,15 @@ impl BackendStorage for CpuStorage {
                 let data = unary_map(storage, layout, |v| f8e4m3::from_f32(v as f32));
                 Ok(Self::F8E4M3(data))
             }
-            // Dummy types - return error for all conversions
+            // Dummy types - return error for all conversions to/from dummy types
             (_, DType::F6E2M3) | (_, DType::F6E3M2) | (_, DType::F4) | (_, DType::F8E8M0) => {
                 Err(Error::UnsupportedDTypeForOp(dtype, "to_dtype").bt())
+            }
+            (Self::F6E2M3(_), _)
+            | (Self::F6E3M2(_), _)
+            | (Self::F4(_), _)
+            | (Self::F8E8M0(_), _) => {
+                Err(Error::UnsupportedDTypeForOp(self.dtype(), "to_dtype").bt())
             }
         }
     }

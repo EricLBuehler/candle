@@ -75,6 +75,11 @@ pub enum CudaStorageSlice {
     F32(CudaSlice<f32>),
     F64(CudaSlice<f64>),
     F8E4M3(CudaSlice<float8::F8E4M3>),
+    // Dummy types that store raw bytes
+    F6E2M3(CudaSlice<u8>),
+    F6E3M2(CudaSlice<u8>),
+    F4(CudaSlice<u8>),
+    F8E8M0(CudaSlice<u8>),
 }
 
 struct Clone;
@@ -1313,6 +1318,10 @@ impl BackendStorage for CudaStorage {
             CudaStorageSlice::F32(_) => DType::F32,
             CudaStorageSlice::F64(_) => DType::F64,
             CudaStorageSlice::F8E4M3(_) => DType::F8E4M3,
+            CudaStorageSlice::F6E2M3(_) => DType::F6E2M3,
+            CudaStorageSlice::F6E3M2(_) => DType::F6E3M2,
+            CudaStorageSlice::F4(_) => DType::F4,
+            CudaStorageSlice::F8E8M0(_) => DType::F8E8M0,
         }
     }
 

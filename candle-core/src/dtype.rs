@@ -104,10 +104,10 @@ impl DType {
             Self::F32 => 4,
             Self::F64 => 8,
             Self::F8E4M3 => 1,
-            Self::F6E2M3 => 1, // 6 bits, rounded up to 1 byte
-            Self::F6E3M2 => 1, // 6 bits, rounded up to 1 byte
-            Self::F4 => 1,     // 4 bits, rounded up to 1 byte
-            Self::F8E8M0 => 1, // 8 bits = 1 byte
+            Self::F6E2M3 => 0, // 6 bits
+            Self::F6E3M2 => 0, // 6 bits
+            Self::F4 => 0,     // 4 bits
+            Self::F8E8M0 => 1,
         }
     }
 

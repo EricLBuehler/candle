@@ -3,7 +3,7 @@
 use crate::backend::{BackendDevice, BackendStorage};
 use crate::conv::{ParamsConv1D, ParamsConv2D, ParamsConvTranspose1D, ParamsConvTranspose2D};
 use crate::op::{BinaryOpT, CmpOp, ReduceOp, UnaryOpT};
-use crate::{CpuStorage, CpuStorageRef, DType, Layout, Result, Shape};
+use crate::{CpuStorage, CpuStorageRef, DType, Error, Layout, Result, Shape};
 use candle_metal_kernels::{BufferOffset, CallConvTranspose2dCfg, Kernels};
 use metal::{Buffer, MTLResourceOptions, NSUInteger};
 use std::collections::HashMap;
@@ -2121,6 +2121,12 @@ impl BackendDevice for MetalDevice {
             CpuStorageRef::F32(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorageRef::F64(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorageRef::F8E4M3(storage) => (storage.len(), self.new_buffer_with_data(storage)),
+            CpuStorageRef::F6E2M3(_)
+            | CpuStorageRef::F6E3M2(_)
+            | CpuStorageRef::F4(_)
+            | CpuStorageRef::F8E8M0(_) => {
+                return Err(Error::UnsupportedDTypeForOp(T::DTYPE, "to_dtype").bt())
+            }
         };
         Ok(Self::Storage::new(buffer?, self.clone(), count, T::DTYPE))
     }
@@ -2137,6 +2143,12 @@ impl BackendDevice for MetalDevice {
             CpuStorage::F32(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorage::F64(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorage::F8E4M3(storage) => (storage.len(), self.new_buffer_with_data(storage)),
+            CpuStorage::F6E2M3(_)
+            | CpuStorage::F6E3M2(_)
+            | CpuStorage::F4(_)
+            | CpuStorage::F8E8M0(_) => {
+                return Err(Error::UnsupportedDTypeForOp(storage.dtype(), "to_dtype").bt())
+            }
         };
         Ok(Self::Storage::new(
             buffer?,

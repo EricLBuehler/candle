@@ -9,8 +9,7 @@
 //! Tensors can also be serialized to safetensor format using the `save` function or
 //! `Tensor::save_safetensors` method.
 //!
-use crate::backend::BackpropOp;
-use crate::op::Op;
+use crate::op::BackpropOp;
 use crate::storage::Storage;
 use crate::tensor::from_storage;
 use crate::{DType, Device, Error, Result, Tensor, WithDType};
@@ -238,16 +237,52 @@ impl Tensor {
                         Storage::Cpu(cpu_storage)
                     }
                     #[cfg(feature = "cuda")]
+                    Device::Cuda(device) => {
+                        // For CUDA, we need to allocate the buffer and copy the raw bytes
+                        let slice = match dtype {
+                            DType::F6E2M3 => {
+                                let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
+                                crate::cuda_backend::CudaStorageSlice::F6E2M3(slice)
+                            }
+                            DType::F6E3M2 => {
+                                let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
+                                crate::cuda_backend::CudaStorageSlice::F6E3M2(slice)
+                            }
+                            DType::F4 => {
+                                let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
+                                crate::cuda_backend::CudaStorageSlice::F4(slice)
+                            }
+                            DType::F8E8M0 => {
+                                let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
+                                crate::cuda_backend::CudaStorageSlice::F8E8M0(slice)
+                            }
+                            _ => unreachable!(),
+                        };
+                        let storage = crate::cuda_backend::CudaStorage {
+                            slice,
+                            device: device.clone(),
+                        };
+                        Storage::Cuda(storage)
+                    }
+                    #[cfg(not(feature = "cuda"))]
                     Device::Cuda(_) => {
-                        return Err(Error::Msg(format!(
-                            "Dummy type {dtype:?} is not supported on CUDA devices"
-                        )));
+                        return Err(Error::Msg("CUDA support not compiled".to_string()));
                     }
                     #[cfg(feature = "metal")]
+                    Device::Metal(device) => {
+                        let buffer = device.new_buffer_with_data(data)?;
+
+                        let storage = crate::metal_backend::MetalStorage::new(
+                            buffer,
+                            device.clone(),
+                            data.len(),
+                            dtype,
+                        );
+                        Storage::Metal(storage)
+                    }
+                    #[cfg(not(feature = "metal"))]
                     Device::Metal(_) => {
-                        return Err(Error::Msg(format!(
-                            "Dummy type {dtype:?} is not supported on Metal devices"
-                        )));
+                        return Err(Error::Msg("Metal support not compiled".to_string()));
                     }
                 };
 
@@ -287,7 +322,7 @@ fn convert(view: &st::TensorView<'_>, device: &Device) -> Result<Tensor> {
 fn convert_dummy(view: &st::TensorView<'_>, device: &Device) -> Result<Tensor> {
     // For dummy types, we'll create the appropriate storage variant that preserves
     // both the raw data and the correct dtype
-    let (dtype, dtype_name) = match view.dtype() {
+    let (dtype, _dtype_name) = match view.dtype() {
         st::Dtype::F6_E2M3 => (DType::F6E2M3, "F6_E2M3 (MX6)"),
         st::Dtype::F6_E3M2 => (DType::F6E3M2, "F6_E3M2 (MX6)"),
         st::Dtype::F4 => (DType::F4, "F4 (MX4)"),
@@ -312,16 +347,48 @@ fn convert_dummy(view: &st::TensorView<'_>, device: &Device) -> Result<Tensor> {
             Storage::Cpu(cpu_storage)
         }
         #[cfg(feature = "cuda")]
+        Device::Cuda(device) => {
+            // For CUDA, we need to allocate the buffer and copy the raw bytes
+            let slice = match dtype {
+                DType::F6E2M3 => {
+                    let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
+                    crate::cuda_backend::CudaStorageSlice::F6E2M3(slice)
+                }
+                DType::F6E3M2 => {
+                    let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
+                    crate::cuda_backend::CudaStorageSlice::F6E3M2(slice)
+                }
+                DType::F4 => {
+                    let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
+                    crate::cuda_backend::CudaStorageSlice::F4(slice)
+                }
+                DType::F8E8M0 => {
+                    let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
+                    crate::cuda_backend::CudaStorageSlice::F8E8M0(slice)
+                }
+                _ => unreachable!(),
+            };
+            let storage = crate::cuda_backend::CudaStorage {
+                slice,
+                device: device.clone(),
+            };
+            Storage::Cuda(storage)
+        }
+        #[cfg(not(feature = "cuda"))]
         Device::Cuda(_) => {
-            return Err(Error::Msg(format!(
-                "Dummy type {dtype_name} is not supported on CUDA devices"
-            )));
+            return Err(Error::Msg("CUDA support not compiled".to_string()));
         }
         #[cfg(feature = "metal")]
+        Device::Metal(device) => {
+            let buffer = device.new_buffer_with_data(data)?;
+
+            let storage =
+                crate::metal_backend::MetalStorage::new(buffer, device.clone(), data.len(), dtype);
+            Storage::Metal(storage)
+        }
+        #[cfg(not(feature = "metal"))]
         Device::Metal(_) => {
-            return Err(Error::Msg(format!(
-                "Dummy type {dtype_name} is not supported on Metal devices"
-            )));
+            return Err(Error::Msg("Metal support not compiled".to_string()));
         }
     };
 
@@ -347,9 +414,6 @@ fn convert_back(tensor: &Tensor) -> Result<Vec<u8>> {
         DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
             // For dummy types, extract the raw bytes from storage
             let storage = tensor.storage();
-            let storage = storage
-                .read()
-                .map_err(|_| Error::Msg("Failed to lock storage".to_string()))?;
 
             match &*storage {
                 Storage::Cpu(cpu_storage) => match cpu_storage {
@@ -362,13 +426,36 @@ fn convert_back(tensor: &Tensor) -> Result<Vec<u8>> {
                     ),
                 },
                 #[cfg(feature = "cuda")]
-                Storage::Cuda(_) => {
-                    Err(Error::Msg("Dummy types are not supported on CUDA".to_string()).bt())
+                Storage::Cuda(cuda_storage) => {
+                    // For dummy types on CUDA, copy the raw bytes back from GPU
+                    match &cuda_storage.slice {
+                        crate::cuda_backend::CudaStorageSlice::F6E2M3(slice)
+                        | crate::cuda_backend::CudaStorageSlice::F6E3M2(slice)
+                        | crate::cuda_backend::CudaStorageSlice::F4(slice)
+                        | crate::cuda_backend::CudaStorageSlice::F8E8M0(slice) => {
+                            cuda_storage.device.cuda_device().dtoh_sync_copy(slice).w()
+                        }
+                        _ => Err(Error::Msg(
+                            "Internal error: dtype mismatch in CUDA storage".to_string(),
+                        )
+                        .bt()),
+                    }
                 }
+                #[cfg(not(feature = "cuda"))]
+                Storage::Cuda(_) => Err(Error::Msg("CUDA support not compiled".to_string()).bt()),
                 #[cfg(feature = "metal")]
-                Storage::Metal(_) => {
-                    Err(Error::Msg("Dummy types are not supported on Metal".to_string()).bt())
+                Storage::Metal(metal_storage) => {
+                    // For dummy types on Metal, read the raw bytes from the buffer
+                    let _dtype_size = tensor.dtype().size_in_bytes();
+                    let length = metal_storage.buffer().length() as usize;
+                    let buffer = metal_storage.buffer();
+                    let contents = buffer.contents();
+                    let slice =
+                        unsafe { std::slice::from_raw_parts(contents as *const u8, length) };
+                    Ok(slice.to_vec())
                 }
+                #[cfg(not(feature = "metal"))]
+                Storage::Metal(_) => Err(Error::Msg("Metal support not compiled".to_string()).bt()),
             }
         }
     }
