@@ -2074,6 +2074,7 @@ impl BackendDevice for MetalDevice {
             buffers: Arc::new(RwLock::new(HashMap::new())),
             kernels,
             seed,
+            seed_value: Arc::new(RwLock::new(299792458)),
         })
     }
 
@@ -2222,6 +2223,8 @@ impl BackendDevice for MetalDevice {
     }
 
     fn set_seed(&self, seed: u64) -> Result<()> {
+        *self.seed_value.write().unwrap() = seed;
+
         let seed: u32 = seed.try_into().map_err(|_| {
             MetalError::Message("Metal seed must be less than or equal to u32::MAX".to_string())
         })?;
@@ -2234,6 +2237,10 @@ impl BackendDevice for MetalDevice {
         seed_buffer.did_modify_range(metal::NSRange::new(0, 4));
 
         Ok(())
+    }
+
+    fn get_current_seed(&self) -> Result<u64> {
+        Ok(*self.seed_value.read().unwrap())
     }
 
     fn synchronize(&self) -> Result<()> {

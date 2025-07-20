@@ -5,7 +5,7 @@ pub use cudarc;
 use cudarc::driver::CudaFunction;
 use half::{bf16, f16};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use super::{CudaError, CudaStorage, CudaStorageSlice, WrapErr};
 
@@ -38,6 +38,7 @@ pub struct CudaDevice {
     stream: Arc<cudarc::driver::CudaStream>,
     pub(crate) blas: Arc<cudarc::cublas::CudaBlas>,
     curand: Arc<Mutex<CudaRng>>,
+    seed_value: Arc<RwLock<u64>>,
 }
 
 impl std::fmt::Debug for CudaDevice {
@@ -274,6 +275,7 @@ impl BackendDevice for CudaDevice {
             curand: Arc::new(Mutex::new(CudaRng(curand))),
             modules: Arc::new(std::sync::RwLock::new(module_store)),
             custom_modules: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            seed_value: Arc::new(RwLock::new(299792458)),
         })
     }
 
@@ -282,7 +284,12 @@ impl BackendDevice for CudaDevice {
         // state will be identical and the same random numbers will be generated.
         let mut curand = self.curand.lock().unwrap();
         curand.0 = cudarc::curand::CudaRng::new(seed, self.stream.clone()).w()?;
+        *self.seed_value.write().unwrap() = seed;
         Ok(())
+    }
+
+    fn get_current_seed(&self) -> Result<u64> {
+        Ok(*self.seed_value.read().unwrap())
     }
 
     fn location(&self) -> crate::DeviceLocation {

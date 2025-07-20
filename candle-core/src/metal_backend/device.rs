@@ -127,6 +127,8 @@ pub struct MetalDevice {
     pub(crate) kernels: Arc<Kernels>,
     /// Seed for random number generation.
     pub(crate) seed: Arc<Mutex<Buffer>>,
+    /// Value of the current seed
+    pub(crate) seed_value: Arc<RwLock<u64>>,
 }
 
 impl std::fmt::Debug for MetalDevice {
@@ -236,7 +238,7 @@ impl MetalDevice {
         let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
         self.allocate_buffer(size, MTLResourceOptions::StorageModePrivate, name)
     }
-    
+
     pub fn new_buffer_private(
         &self,
         element_count: usize,
