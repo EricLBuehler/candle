@@ -1348,6 +1348,13 @@ impl BackendStorage for CudaStorage {
             S::F32(s) => (slice_ptr(s, src_o), "const_set_f32"),
             S::F64(s) => (slice_ptr(s, src_o), "const_set_f64"),
             S::F8E4M3(s) => (slice_ptr(s, src_o), "const_set_f8e4m3"),
+            S::F4(_) | S::F6E2M3(_) | S::F6E3M2(_) | S::F8E8M0(_) => {
+                return Err(CudaError::UnsupportedDtype {
+                    dtype: self.dtype(),
+                    op: "const_set",
+                }
+                .into());
+            }
         };
 
         let func = dev.get_or_load_func(kernel_name, &kernels::FILL)?;
@@ -1384,6 +1391,16 @@ impl BackendStorage for CudaStorage {
             CudaStorageSlice::F32(inp) => slice_ptr(inp, start_o),
             CudaStorageSlice::F64(inp) => slice_ptr(inp, start_o),
             CudaStorageSlice::F8E4M3(inp) => slice_ptr(inp, start_o),
+            CudaStorageSlice::F4(_)
+            | CudaStorageSlice::F6E2M3(_)
+            | CudaStorageSlice::F6E3M2(_)
+            | CudaStorageSlice::F8E8M0(_) => {
+                return Err(CudaError::UnsupportedDtype {
+                    dtype: self.dtype(),
+                    op: "to_dtype",
+                }
+                .into());
+            }
         };
         let inp = &inp;
 
@@ -1578,9 +1595,18 @@ impl BackendStorage for CudaStorage {
                 let cpu_storage = slice.stream().memcpy_dtov(slice).w()?;
                 Ok(CpuStorage::F64(cpu_storage))
             }
-            CudaStorageSlice::F8E4M3(_slice) => Err(CudaError::InternalError(
-                "to_cpu_storage not supported for f8e4m3",
-            ))?,
+            CudaStorageSlice::F8E4M3(slice) => {
+                let cpu_storage = slice.stream().memcpy_dtov(slice).w()?;
+                Ok(CpuStorage::F8E4M3(cpu_storage))
+            }
+            CudaStorageSlice::F4(_)
+            | CudaStorageSlice::F6E2M3(_)
+            | CudaStorageSlice::F6E3M2(_)
+            | CudaStorageSlice::F8E8M0(_) => Err(CudaError::UnsupportedDtype {
+                dtype: self.dtype(),
+                op: "to_cpu_storage",
+            }
+            .into()),
         }
     }
 

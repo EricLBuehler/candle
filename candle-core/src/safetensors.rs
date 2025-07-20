@@ -238,24 +238,14 @@ impl Tensor {
                     }
                     #[cfg(feature = "cuda")]
                     Device::Cuda(device) => {
-                        // For CUDA, we need to allocate the buffer and copy the raw bytes
+                        let mut slice = unsafe { device.alloc::<u8>(data.len())? };
+                        device.memcpy_htod(data, &mut slice)?;
+
                         let slice = match dtype {
-                            DType::F6E2M3 => {
-                                let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
-                                crate::cuda_backend::CudaStorageSlice::F6E2M3(slice)
-                            }
-                            DType::F6E3M2 => {
-                                let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
-                                crate::cuda_backend::CudaStorageSlice::F6E3M2(slice)
-                            }
-                            DType::F4 => {
-                                let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
-                                crate::cuda_backend::CudaStorageSlice::F4(slice)
-                            }
-                            DType::F8E8M0 => {
-                                let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
-                                crate::cuda_backend::CudaStorageSlice::F8E8M0(slice)
-                            }
+                            DType::F6E2M3 => crate::cuda_backend::CudaStorageSlice::F6E2M3(slice),
+                            DType::F6E3M2 => crate::cuda_backend::CudaStorageSlice::F6E3M2(slice),
+                            DType::F4 => crate::cuda_backend::CudaStorageSlice::F4(slice),
+                            DType::F8E8M0 => crate::cuda_backend::CudaStorageSlice::F8E8M0(slice),
                             _ => unreachable!(),
                         };
                         let storage = crate::cuda_backend::CudaStorage {
@@ -348,24 +338,14 @@ fn convert_dummy(view: &st::TensorView<'_>, device: &Device) -> Result<Tensor> {
         }
         #[cfg(feature = "cuda")]
         Device::Cuda(device) => {
-            // For CUDA, we need to allocate the buffer and copy the raw bytes
+            let mut slice = unsafe { device.alloc::<u8>(data.len())? };
+            device.memcpy_htod(data, &mut slice)?;
+
             let slice = match dtype {
-                DType::F6E2M3 => {
-                    let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
-                    crate::cuda_backend::CudaStorageSlice::F6E2M3(slice)
-                }
-                DType::F6E3M2 => {
-                    let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
-                    crate::cuda_backend::CudaStorageSlice::F6E3M2(slice)
-                }
-                DType::F4 => {
-                    let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
-                    crate::cuda_backend::CudaStorageSlice::F4(slice)
-                }
-                DType::F8E8M0 => {
-                    let slice = device.cuda_device().htod_copy(data.to_vec()).w()?;
-                    crate::cuda_backend::CudaStorageSlice::F8E8M0(slice)
-                }
+                DType::F6E2M3 => crate::cuda_backend::CudaStorageSlice::F6E2M3(slice),
+                DType::F6E3M2 => crate::cuda_backend::CudaStorageSlice::F6E3M2(slice),
+                DType::F4 => crate::cuda_backend::CudaStorageSlice::F4(slice),
+                DType::F8E8M0 => crate::cuda_backend::CudaStorageSlice::F8E8M0(slice),
                 _ => unreachable!(),
             };
             let storage = crate::cuda_backend::CudaStorage {
@@ -412,51 +392,7 @@ fn convert_back(tensor: &Tensor) -> Result<Vec<u8>> {
         DType::F64 => Ok(convert_back_::<f64>(tensor.to_vec1()?)),
         DType::F8E4M3 => Ok(convert_back_::<float8::F8E4M3>(tensor.to_vec1()?)),
         DType::F6E2M3 | DType::F6E3M2 | DType::F4 | DType::F8E8M0 => {
-            // For dummy types, extract the raw bytes from storage
-            let storage = tensor.storage();
-
-            match &*storage {
-                Storage::Cpu(cpu_storage) => match cpu_storage {
-                    crate::cpu_backend::CpuStorage::F6E2M3(data)
-                    | crate::cpu_backend::CpuStorage::F6E3M2(data)
-                    | crate::cpu_backend::CpuStorage::F4(data)
-                    | crate::cpu_backend::CpuStorage::F8E8M0(data) => Ok(data.clone()),
-                    _ => Err(
-                        Error::Msg("Internal error: dtype mismatch in storage".to_string()).bt(),
-                    ),
-                },
-                #[cfg(feature = "cuda")]
-                Storage::Cuda(cuda_storage) => {
-                    // For dummy types on CUDA, copy the raw bytes back from GPU
-                    match &cuda_storage.slice {
-                        crate::cuda_backend::CudaStorageSlice::F6E2M3(slice)
-                        | crate::cuda_backend::CudaStorageSlice::F6E3M2(slice)
-                        | crate::cuda_backend::CudaStorageSlice::F4(slice)
-                        | crate::cuda_backend::CudaStorageSlice::F8E8M0(slice) => {
-                            cuda_storage.device.cuda_device().dtoh_sync_copy(slice).w()
-                        }
-                        _ => Err(Error::Msg(
-                            "Internal error: dtype mismatch in CUDA storage".to_string(),
-                        )
-                        .bt()),
-                    }
-                }
-                #[cfg(not(feature = "cuda"))]
-                Storage::Cuda(_) => Err(Error::Msg("CUDA support not compiled".to_string()).bt()),
-                #[cfg(feature = "metal")]
-                Storage::Metal(metal_storage) => {
-                    // For dummy types on Metal, read the raw bytes from the buffer
-                    let _dtype_size = tensor.dtype().size_in_bytes();
-                    let length = metal_storage.buffer().length() as usize;
-                    let buffer = metal_storage.buffer();
-                    let contents = buffer.contents();
-                    let slice =
-                        unsafe { std::slice::from_raw_parts(contents as *const u8, length) };
-                    Ok(slice.to_vec())
-                }
-                #[cfg(not(feature = "metal"))]
-                Storage::Metal(_) => Err(Error::Msg("Metal support not compiled".to_string()).bt()),
-            }
+            Err(Error::Msg("Internal error: dtype mismatch in storage".to_string()).bt())
         }
     }
 }

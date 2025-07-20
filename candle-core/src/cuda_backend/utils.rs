@@ -26,8 +26,8 @@ pub trait Map1 {
             S::F16(s) => S::F16(self.f(s, d, l)?),
             S::F32(s) => S::F32(self.f(s, d, l)?),
             S::F64(s) => S::F64(self.f(s, d, l)?),
-            S::F8E4M3(_s) => {
-                return Err(CudaError::InternalError("Map1 not supported for F8E4M3"))?
+            S::F8E4M3(_) | S::F4(_) | S::F6E2M3(_) | S::F6E3M2(_) | S::F8E8M0(_) => {
+                crate::bail!("Map1 does not uspport this dtype.");
             }
         };
         Ok(out)
@@ -158,8 +158,8 @@ pub trait Map1Any {
             S::F16(s) => self.f(s, d, l, S::F16)?,
             S::F32(s) => self.f(s, d, l, S::F32)?,
             S::F64(s) => self.f(s, d, l, S::F64)?,
-            S::F8E4M3(_s) => {
-                return Err(CudaError::InternalError("Map1Any not supported for F8E4M3"))?
+            S::F8E4M3(_) | S::F4(_) | S::F6E2M3(_) | S::F6E3M2(_) | S::F8E8M0(_) => {
+                crate::bail!("Map1 does not uspport this dtype.");
             }
         };
         Ok(out)

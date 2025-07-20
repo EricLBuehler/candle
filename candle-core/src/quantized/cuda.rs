@@ -588,7 +588,7 @@ impl QCudaStorage {
     pub fn data(&self) -> Result<Vec<u8>> {
         let mut out = vec![0u8; self.data.len];
         self.device
-            .memcpy_dtoh(&mut out, &self.data.inner.slice(..self.data.len))?;
+            .memcpy_dtoh(&self.data.inner.slice(..self.data.len), &mut out)?;
         Ok(out)
     }
 }

@@ -1,4 +1,4 @@
-use crate::backend::BackendDevice;
+use crate::backend::{BackendDevice, BackendStorage};
 use crate::{CpuStorage, CpuStorageRef, DType, Layout, Result, Shape};
 pub use candle_kernels as kernels;
 pub use cudarc;
@@ -92,6 +92,18 @@ impl CudaDevice {
         dst: &mut Dst,
     ) -> Result<()> {
         self.stream.memcpy_dtod(src, dst).w()
+    }
+
+    pub fn memcpy_dtoh<
+        T: cudarc::driver::DeviceRepr,
+        Src: cudarc::driver::DevicePtr<T>,
+        Dst: cudarc::driver::HostSlice<T>,
+    >(
+        &self,
+        src: &Src,
+        dst: &mut Dst,
+    ) -> Result<()> {
+        self.stream.memcpy_dtoh(src, dst).w()
     }
 
     pub fn memcpy_stod<
@@ -548,8 +560,19 @@ impl BackendDevice for CudaDevice {
                 let data = self.memcpy_stod(storage)?;
                 CudaStorageSlice::F64(data)
             }
-            CpuStorageRef::F8E4M3(_storage) => {
-                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").into())
+            CpuStorageRef::F8E4M3(storage) => {
+                let data = self.memcpy_stod(storage)?;
+                CudaStorageSlice::F8E4M3(data)
+            }
+            CpuStorageRef::F4(_)
+            | CpuStorageRef::F6E2M3(_)
+            | CpuStorageRef::F6E3M2(_)
+            | CpuStorageRef::F8E8M0(_) => {
+                return Err(CudaError::UnsupportedDtype {
+                    dtype: T::DTYPE,
+                    op: "storage_from_slice",
+                }
+                .into());
             }
         };
         Ok(CudaStorage {
@@ -596,8 +619,19 @@ impl BackendDevice for CudaDevice {
                 let data = self.memcpy_stod(storage)?;
                 CudaStorageSlice::F64(data)
             }
-            CpuStorage::F8E4M3(_storage) => {
-                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").into())
+            CpuStorage::F8E4M3(storage) => {
+                let data = self.memcpy_stod(storage)?;
+                CudaStorageSlice::F8E4M3(data)
+            }
+            CpuStorage::F4(_)
+            | CpuStorage::F6E2M3(_)
+            | CpuStorage::F6E3M2(_)
+            | CpuStorage::F8E8M0(_) => {
+                return Err(CudaError::UnsupportedDtype {
+                    dtype: storage.dtype(),
+                    op: "storage_from_cpu_storage",
+                }
+                .into());
             }
         };
         Ok(CudaStorage {
@@ -644,8 +678,19 @@ impl BackendDevice for CudaDevice {
                 let data = self.memcpy_stod(&storage)?;
                 CudaStorageSlice::F64(data)
             }
-            CpuStorage::F8E4M3(_storage) => {
-                return Err(CudaError::InternalError("F8E4M3 not supported in CUDA backend").into())
+            CpuStorage::F8E4M3(storage) => {
+                let data = self.memcpy_stod(&storage)?;
+                CudaStorageSlice::F8E4M3(data)
+            }
+            CpuStorage::F4(_)
+            | CpuStorage::F6E2M3(_)
+            | CpuStorage::F6E3M2(_)
+            | CpuStorage::F8E8M0(_) => {
+                return Err(CudaError::UnsupportedDtype {
+                    dtype: storage.dtype(),
+                    op: "storage_from_cpu_storage_owned",
+                }
+                .into());
             }
         };
         Ok(CudaStorage {
