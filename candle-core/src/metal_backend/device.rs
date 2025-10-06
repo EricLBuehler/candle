@@ -244,7 +244,7 @@ impl MetalDevice {
     ) -> Result<Arc<Buffer>> {
         let size_bytes = element_count * dtype.size_in_bytes();
         if let Some(pool) = current_pool() {
-            let allocation = pool.allocate(size_bytes)?;
+            let allocation = pool.allocate(size_bytes, dtype.size_in_bytes())?;
             let buffer = Arc::clone(allocation.buffer());
             register_pool_allocation(&buffer, allocation);
             Ok(buffer)

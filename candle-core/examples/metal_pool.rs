@@ -15,6 +15,9 @@ fn run() -> Result<()> {
 
     // Allocate a 4 MB pool for intermediate activations.
     let pooled = input.start_pool(4 * 1024 * 1024)?;
+    println!("{input}");
+    println!("{pooled}");
+    println!("{}", pooled.sin()?);
 
     let logits = pooled.sin()?.mul(&pooled.cos()?)?;
     let final_tensor = logits.tanh()?.leave_pool()?;

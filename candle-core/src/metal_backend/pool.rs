@@ -1,51 +1,96 @@
 use crate::Result;
 use metal::Buffer;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use super::{MetalDevice, MetalError};
 
 const ALIGNMENT: usize = 256;
 
-fn align_size(size: usize) -> usize {
-    if size == 0 {
-        0
-    } else {
-        ((size + ALIGNMENT - 1) / ALIGNMENT) * ALIGNMENT
+fn align_up(value: usize, alignment: usize) -> usize {
+    if alignment == 0 {
+        return value;
     }
+    ((value + alignment - 1) / alignment) * alignment
 }
 
 #[derive(Debug)]
 struct PoolState {
+    free: Vec<(usize, usize)>,
     used: usize,
-    free: HashMap<usize, Vec<Arc<Buffer>>>,
 }
 
 impl PoolState {
-    fn new() -> Self {
+    fn new(capacity: usize) -> Self {
         Self {
+            free: vec![(0, capacity)],
             used: 0,
-            free: HashMap::new(),
         }
     }
 
-    fn pop(&mut self, size: usize) -> Option<Arc<Buffer>> {
-        let mut remove_entry = false;
-        let buffer = self.free.get_mut(&size).and_then(|list| {
-            let buffer = list.pop();
-            if list.is_empty() {
-                remove_entry = true;
+    fn allocate(&mut self, size: usize, alignment: usize, capacity: usize) -> Option<usize> {
+        let alignment = alignment.max(ALIGNMENT);
+        for idx in 0..self.free.len() {
+            let (start, len) = self.free[idx];
+            let aligned_start = align_up(start, alignment);
+            if aligned_start >= start + len {
+                continue;
             }
-            buffer
-        });
-        if remove_entry {
-            self.free.remove(&size);
+            let padding = aligned_start - start;
+            let available = len.saturating_sub(padding);
+            if available < size {
+                continue;
+            }
+            let remaining = available - size;
+            self.free.remove(idx);
+            if padding > 0 {
+                self.free.insert(idx, (start, padding));
+            }
+            if remaining > 0 {
+                self.free.insert(
+                    idx + (padding > 0) as usize,
+                    (aligned_start + size, remaining),
+                );
+            }
+            self.used += size;
+            debug_assert!(self.used <= capacity);
+            return Some(aligned_start);
         }
-        buffer
+        None
     }
 
-    fn push(&mut self, size: usize, buffer: Arc<Buffer>) {
-        self.free.entry(size).or_default().push(buffer);
+    fn free(&mut self, offset: usize, size: usize) {
+        if size == 0 {
+            return;
+        }
+        self.used = self.used.saturating_sub(size);
+        let mut insert_pos = 0;
+        while insert_pos < self.free.len() && self.free[insert_pos].0 < offset {
+            insert_pos += 1;
+        }
+        self.free.insert(insert_pos, (offset, size));
+        // Merge with previous block if adjacent.
+        if insert_pos > 0 {
+            if let Some(merged) = try_merge(self.free[insert_pos - 1], self.free[insert_pos]) {
+                self.free[insert_pos - 1] = merged;
+                self.free.remove(insert_pos);
+                insert_pos -= 1;
+            }
+        }
+        // Merge with next block if adjacent.
+        if insert_pos + 1 < self.free.len() {
+            if let Some(merged) = try_merge(self.free[insert_pos], self.free[insert_pos + 1]) {
+                self.free[insert_pos] = merged;
+                self.free.remove(insert_pos + 1);
+            }
+        }
+    }
+}
+
+fn try_merge(lhs: (usize, usize), rhs: (usize, usize)) -> Option<(usize, usize)> {
+    if lhs.0 + lhs.1 == rhs.0 {
+        Some((lhs.0, lhs.1 + rhs.1))
+    } else {
+        None
     }
 }
 
@@ -53,6 +98,7 @@ impl PoolState {
 pub struct MetalTensorPool {
     device: MetalDevice,
     capacity: usize,
+    buffer: Arc<Buffer>,
     state: Mutex<PoolState>,
 }
 
@@ -61,10 +107,15 @@ impl MetalTensorPool {
         if capacity == 0 {
             crate::bail!("Pool capacity must be greater than 0");
         }
+        let buffer = Arc::new(device.device().new_buffer(
+            capacity as u64,
+            metal::MTLResourceOptions::StorageModePrivate,
+        ));
         Ok(Arc::new(Self {
             device,
             capacity,
-            state: Mutex::new(PoolState::new()),
+            buffer,
+            state: Mutex::new(PoolState::new(capacity)),
         }))
     }
 
@@ -72,39 +123,39 @@ impl MetalTensorPool {
         &self.device
     }
 
-    pub fn allocate(self: &Arc<Self>, size_in_bytes: usize) -> Result<Arc<MetalPoolAllocation>> {
+    pub fn buffer(&self) -> &Arc<Buffer> {
+        &self.buffer
+    }
+
+    pub fn allocate(
+        self: &Arc<Self>,
+        size_in_bytes: usize,
+        alignment: usize,
+    ) -> Result<Arc<MetalPoolAllocation>> {
         if size_in_bytes == 0 {
             crate::bail!("Cannot allocate zero bytes from pool");
         }
-        let aligned = align_size(size_in_bytes);
         let mut state = self.state.lock().map_err(MetalError::from)?;
-        if state.used + aligned > self.capacity {
-            crate::bail!(
-                "Metal tensor pool exhausted: requested {aligned} bytes, capacity {} bytes",
-                self.capacity
-            );
-        }
-        let buffer = if let Some(buffer) = state.pop(aligned) {
-            buffer
+        if let Some(offset) = state.allocate(size_in_bytes, alignment, self.capacity) {
+            Ok(Arc::new(MetalPoolAllocation {
+                pool: Arc::clone(self),
+                offset,
+                size: size_in_bytes,
+            }))
         } else {
-            Arc::new(self.device.device().new_buffer(
-                aligned as u64,
-                metal::MTLResourceOptions::StorageModePrivate,
-            ))
-        };
-        state.used += aligned;
-        drop(state);
-        Ok(Arc::new(MetalPoolAllocation {
-            pool: Arc::clone(self),
-            buffer,
-            size: aligned,
-        }))
+            crate::bail!(
+                "Metal tensor pool exhausted: requested {size_in_bytes} bytes, capacity {} bytes",
+                self.capacity
+            )
+        }
     }
 
-    fn release(&self, size: usize, buffer: Arc<Buffer>) {
+    fn release(&self, offset: usize, size: usize) {
+        if size == 0 {
+            return;
+        }
         if let Ok(mut state) = self.state.lock() {
-            state.used = state.used.saturating_sub(size);
-            state.push(size, buffer);
+            state.free(offset, size);
         }
     }
 }
@@ -112,13 +163,17 @@ impl MetalTensorPool {
 #[derive(Debug)]
 pub struct MetalPoolAllocation {
     pool: Arc<MetalTensorPool>,
-    buffer: Arc<Buffer>,
+    offset: usize,
     size: usize,
 }
 
 impl MetalPoolAllocation {
     pub fn buffer(&self) -> &Arc<Buffer> {
-        &self.buffer
+        &self.pool.buffer
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
     }
 
     pub fn size(&self) -> usize {
@@ -132,7 +187,6 @@ impl MetalPoolAllocation {
 
 impl Drop for MetalPoolAllocation {
     fn drop(&mut self) {
-        let buffer = Arc::clone(&self.buffer);
-        self.pool.release(self.size, buffer);
+        self.pool.release(self.offset, self.size);
     }
 }
