@@ -174,7 +174,7 @@ impl candle::CustomOp1 for Sigmoid {
                     kernel_name,
                     el_count,
                     src,
-                    &buffer,
+                    device.buffer_offset(&buffer),
                 )
                 .map_err(MetalError::from)?;
             }
@@ -195,7 +195,7 @@ impl candle::CustomOp1 for Sigmoid {
                     kernel_name,
                     el_count,
                     src,
-                    &buffer,
+                    device.buffer_offset(&buffer),
                 )
                 .map_err(MetalError::from)?;
             }
@@ -209,7 +209,7 @@ impl candle::CustomOp1 for Sigmoid {
                         candle::bail!("Metal strided unary sigmoid {dtype:?} not implemented")
                     }
                 };
-                let dst = candle_metal_kernels::BufferOffset::zero_offset(&buffer);
+                let dst = device.buffer_offset(&buffer);
                 candle_metal_kernels::call_unary_strided(
                     device.metal_device(),
                     &command_buffer,
@@ -437,7 +437,7 @@ impl candle::CustomOp1 for SoftmaxLastDim {
             last_dim,
             storage.buffer(),
             layout.start_offset() * storage.dtype().size_in_bytes(),
-            &output,
+            device.buffer_offset(&output),
         )
         .map_err(candle::Error::wrap)?;
         let newstorage =
@@ -630,7 +630,7 @@ impl candle::CustomOp2 for RmsNorm {
             l1.start_offset() * s1.dtype().size_in_bytes(),
             s2.buffer(),
             l2.start_offset() * s2.dtype().size_in_bytes(),
-            &output,
+            device.buffer_offset(&output),
         )
         .map_err(candle::Error::wrap)?;
         let newstorage = candle::MetalStorage::new(output, device.clone(), elem_count, s1.dtype());
@@ -876,7 +876,7 @@ impl candle::CustomOp3 for LayerNorm {
             l2.start_offset() * s2.dtype().size_in_bytes(),
             s3.buffer(),
             l3.start_offset() * s3.dtype().size_in_bytes(),
-            &output,
+            device.buffer_offset(&output),
         )
         .map_err(candle::Error::wrap)?;
         let newstorage = candle::MetalStorage::new(output, device.clone(), elem_count, s1.dtype());
@@ -1091,7 +1091,7 @@ impl candle::CustomOp3 for Sdpa {
             other => candle::bail!("unsupported sdpa type {other:?}"),
         };
 
-        let command_buffer = q.device().command_buffer()?;
+        let command_buffer = device.command_buffer()?;
         if supports_sdpa_vector {
             // Route to the 2 pass fused attention if the k seqlen is large.
             // https://github.com/ml-explore/mlx/pull/1597
@@ -1122,9 +1122,9 @@ impl candle::CustomOp3 for Sdpa {
 
                 command_buffer.set_label("vector_attention");
                 candle_metal_kernels::call_sdpa_vector_2pass(
-                    q.device().device(),
+                    device.metal_device(),
                     &command_buffer,
-                    q.device().kernels(),
+                    device.kernels(),
                     q_l.start_offset(),
                     q_l.dims(),
                     q.buffer(),
@@ -1135,7 +1135,7 @@ impl candle::CustomOp3 for Sdpa {
                     v_l.start_offset(),
                     v_l.stride(),
                     v.buffer(),
-                    &output,
+                    device.buffer_offset(&output),
                     &intermediate,
                     &sums,
                     &maxs,
@@ -1147,9 +1147,9 @@ impl candle::CustomOp3 for Sdpa {
             } else {
                 command_buffer.set_label("vector_attention");
                 candle_metal_kernels::call_sdpa_vector(
-                    q.device().device(),
+                    device.metal_device(),
                     &command_buffer,
-                    q.device().kernels(),
+                    device.kernels(),
                     q_l.start_offset(),
                     q_l.dims(),
                     q.buffer(),
@@ -1160,7 +1160,7 @@ impl candle::CustomOp3 for Sdpa {
                     v_l.start_offset(),
                     v_l.stride(),
                     v.buffer(),
-                    &output,
+                    device.buffer_offset(&output),
                     self.scale,
                     self.softcapping,
                     itype,
@@ -1211,9 +1211,9 @@ impl candle::CustomOp3 for Sdpa {
             };
 
             candle_metal_kernels::call_sdpa_full(
-                q.device().device(),
+                device.metal_device(),
                 &command_buffer,
-                q.device().kernels(),
+                device.kernels(),
                 q_l.start_offset(),
                 q_l.dims(),
                 q_l.stride(),
@@ -1228,7 +1228,7 @@ impl candle::CustomOp3 for Sdpa {
                 mask_type,
                 mask_buffer,
                 mask_strides.as_deref(),
-                &output,
+                device.buffer_offset(&output),
                 out_layout.stride(),
                 self.scale,
                 self.do_causal,

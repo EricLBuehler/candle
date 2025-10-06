@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
 
-use super::{current_pool, register_pool_allocation, MetalError};
+use super::{buffer_offset_for_output, current_pool, register_pool_allocation, MetalError};
 
 // iOS and macOS have different storage modes for shared buffers.
 // due to the GPU/CPU management differences.
@@ -293,6 +293,10 @@ impl MetalDevice {
         let new_buffer = Arc::new(new_buffer);
         subbuffers.push(new_buffer.clone());
         Ok(new_buffer)
+    }
+
+    pub fn buffer_offset<'a>(&self, buffer: &'a Arc<Buffer>) -> super::BufferOffset<'a> {
+        buffer_offset_for_output(buffer)
     }
 
     pub fn allocate_zeros(&self, size_in_bytes: usize) -> Result<Arc<Buffer>> {

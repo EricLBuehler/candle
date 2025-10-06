@@ -64,6 +64,24 @@ fn take_pool_allocation(buffer: &Arc<Buffer>) -> Option<Arc<MetalPoolAllocation>
     })
 }
 
+fn peek_pool_allocation(buffer: &Arc<Buffer>) -> Option<Arc<MetalPoolAllocation>> {
+    let ptr = Arc::as_ptr(buffer) as usize;
+    pool_registry()
+        .lock()
+        .ok()
+        .and_then(|registry| registry.get(&ptr).and_then(|allocs| allocs.last().cloned()))
+}
+
+fn buffer_offset_for_output(buffer: &Arc<Buffer>) -> BufferOffset<'_> {
+    let offset = peek_pool_allocation(buffer)
+        .map(|alloc| alloc.offset())
+        .unwrap_or(0);
+    BufferOffset {
+        buffer,
+        offset_in_bytes: offset,
+    }
+}
+
 pub fn buffer_o<'a>(storage: &'a MetalStorage, l: &Layout) -> BufferOffset<'a> {
     storage.buffer_offset(l)
 }
@@ -189,7 +207,7 @@ impl BackendStorage for MetalStorage {
                 name,
                 el,
                 src,
-                &buffer,
+                buffer_offset_for_output(&buffer),
                 mul as f32,
                 add as f32,
             )
@@ -209,7 +227,7 @@ impl BackendStorage for MetalStorage {
                 layout.dims(),
                 src,
                 layout.stride(),
-                &buffer,
+                buffer_offset_for_output(&buffer),
                 mul as f32,
                 add as f32,
             )
@@ -243,7 +261,7 @@ impl BackendStorage for MetalStorage {
                 name,
                 el,
                 src,
-                &buffer,
+                buffer_offset_for_output(&buffer),
                 pow as f32,
             )
             .map_err(MetalError::from)?;
@@ -262,7 +280,7 @@ impl BackendStorage for MetalStorage {
                 layout.dims(),
                 src,
                 layout.stride(),
-                &buffer,
+                buffer_offset_for_output(&buffer),
                 pow as f32,
             )
             .map_err(MetalError::from)?;
@@ -295,7 +313,7 @@ impl BackendStorage for MetalStorage {
                 name,
                 el,
                 src,
-                &buffer,
+                buffer_offset_for_output(&buffer),
                 alpha as f32,
             )
             .map_err(MetalError::from)?;
@@ -314,7 +332,7 @@ impl BackendStorage for MetalStorage {
                 layout.dims(),
                 src,
                 layout.stride(),
-                &buffer,
+                buffer_offset_for_output(&buffer),
                 alpha as f32,
             )
             .map_err(MetalError::from)?;
@@ -398,7 +416,7 @@ impl BackendStorage for MetalStorage {
                 src_dims,
                 dst_el,
                 src,
-                &buffer,
+                buffer_offset_for_output(&buffer),
             )
             .map_err(MetalError::from)?;
 
@@ -454,7 +472,7 @@ impl BackendStorage for MetalStorage {
             &stride,
             dst_el,
             src,
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
 
@@ -638,7 +656,7 @@ impl BackendStorage for MetalStorage {
                 kernel_name,
                 el_count,
                 src,
-                &buffer,
+                buffer_offset_for_output(&buffer),
             )
             .map_err(MetalError::from)?;
         } else {
@@ -691,7 +709,7 @@ impl BackendStorage for MetalStorage {
                 layout.dims(),
                 src,
                 layout.stride(),
-                &buffer,
+                buffer_offset_for_output(&buffer),
             )
             .map_err(MetalError::from)?;
         }
@@ -785,7 +803,7 @@ impl BackendStorage for MetalStorage {
                     kernel_name,
                     el_count,
                     src,
-                    &buffer,
+                    buffer_offset_for_output(&buffer),
                 )
                 .map_err(MetalError::from)?;
             }
@@ -861,7 +879,7 @@ impl BackendStorage for MetalStorage {
                     kernel_name,
                     el_count,
                     src,
-                    &buffer,
+                    buffer_offset_for_output(&buffer),
                 )
                 .map_err(MetalError::from)?;
             }
@@ -926,7 +944,7 @@ impl BackendStorage for MetalStorage {
                         crate::bail!("Metal strided unary {name} {dtype:?} not implemented")
                     }
                 };
-                let dst = BufferOffset::zero_offset(&buffer);
+                let dst = buffer_offset_for_output(&buffer);
                 candle_metal_kernels::call_unary_strided(
                     &device.device,
                     &command_buffer,
@@ -1001,7 +1019,7 @@ impl BackendStorage for MetalStorage {
             t_l.stride(),
             f,
             f_l.stride(),
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
         Ok(Self::new(buffer, device, el, dtype))
@@ -1044,7 +1062,7 @@ impl BackendStorage for MetalStorage {
             strides,
             (k_size, stride, padding, dilation),
             src,
-            &dst,
+            buffer_offset_for_output(&dst),
         )
         .map_err(MetalError::from)?;
         let col = Self::new(dst, device, dst_el, self.dtype);
@@ -1139,8 +1157,8 @@ impl BackendStorage for MetalStorage {
                 &[b_size, l_in, c_out, k_size],
                 params.k_size,
                 params.stride,
-                BufferOffset::zero_offset(&col.buffer),
-                &buffer,
+                col.base_offset(),
+                buffer_offset_for_output(&buffer),
             )
             .map_err(MetalError::from)?;
             buffer
@@ -1178,7 +1196,7 @@ impl BackendStorage for MetalStorage {
                 layout.start_offset() * self.dtype.size_in_bytes(),
                 &k.buffer,
                 k_layout.start_offset() * k.dtype.size_in_bytes(),
-                &buffer,
+                buffer_offset_for_output(&buffer),
             )
             .map_err(MetalError::from)?;
             buffer
@@ -1231,7 +1249,7 @@ impl BackendStorage for MetalStorage {
             layout.stride(),
             (h_k, w_k, stride, padding, dilation),
             src,
-            &dst,
+            buffer_offset_for_output(&dst),
         )
         .map_err(MetalError::from)?;
         let col = Self::new(dst, device, dst_el, self.dtype);
@@ -1323,7 +1341,7 @@ impl BackendStorage for MetalStorage {
             },
             &self.buffer,
             &kernel.buffer,
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
         Ok(Self::new(buffer, self.device.clone(), dst_el, self.dtype))
@@ -1366,7 +1384,7 @@ impl BackendStorage for MetalStorage {
             w_stride,
             h_stride,
             &self.buffer,
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
         Ok(Self::new(buffer, self.device.clone(), dst_el, self.dtype))
@@ -1409,7 +1427,7 @@ impl BackendStorage for MetalStorage {
             w_stride,
             h_stride,
             &self.buffer,
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
         Ok(Self::new(buffer, self.device.clone(), dst_el, self.dtype))
@@ -1453,7 +1471,7 @@ impl BackendStorage for MetalStorage {
             out_w,
             out_h,
             src,
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
         Ok(Self::new(buffer, self.device.clone(), dst_el, self.dtype))
@@ -1495,7 +1513,7 @@ impl BackendStorage for MetalStorage {
             dim,
             src,
             ids,
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
         Ok(Self::new(buffer, device.clone(), dst_el, dtype))
@@ -1653,7 +1671,7 @@ impl BackendStorage for MetalStorage {
             src_l.stride(),
             src,
             ids,
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
         Ok(Self::new(buffer, device.clone(), dst_el, dtype))
@@ -1715,7 +1733,7 @@ impl BackendStorage for MetalStorage {
             dim,
             src,
             ids,
-            &acc.buffer,
+            buffer_o(&acc, l),
         )
         .map_err(MetalError::from)?;
         Ok(acc)
@@ -1754,7 +1772,7 @@ impl BackendStorage for MetalStorage {
             rhs_l.stride(),
             rhs_l.start_offset() * rhs.dtype.size_in_bytes(),
             &rhs.buffer,
-            &buffer,
+            buffer_offset_for_output(&buffer),
         )
         .map_err(MetalError::from)?;
 
@@ -1900,11 +1918,17 @@ impl MetalStorage {
             .map(|allocation| allocation.pool())
     }
 
-    fn buffer_offset<'a>(&'a self, layout: &Layout) -> BufferOffset<'a> {
+    fn base_offset(&self) -> BufferOffset<'_> {
         BufferOffset {
             buffer: &self.buffer,
-            offset_in_bytes: self.offset_bytes + layout.start_offset() * self.dtype.size_in_bytes(),
+            offset_in_bytes: self.offset_bytes,
         }
+    }
+
+    fn buffer_offset<'a>(&'a self, layout: &Layout) -> BufferOffset<'a> {
+        let mut base = self.base_offset();
+        base.offset_in_bytes += layout.start_offset() * self.dtype.size_in_bytes();
+        base
     }
 
     fn determine_pool(storages: &[&Self]) -> Result<Option<Arc<MetalTensorPool>>> {
@@ -2029,7 +2053,7 @@ impl MetalStorage {
                 el_count,
                 lhs,
                 rhs,
-                &buffer,
+                buffer_offset_for_output(&buffer),
             )
             .map_err(MetalError::from)?;
             (buffer, dtype)
@@ -2130,7 +2154,7 @@ impl MetalStorage {
                 lhs_l.stride(),
                 rhs,
                 rhs_l.stride(),
-                &buffer,
+                buffer_offset_for_output(&buffer),
             )
             .map_err(MetalError::from)?;
             (buffer, dtype)
