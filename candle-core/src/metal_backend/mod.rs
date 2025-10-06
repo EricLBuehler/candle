@@ -6,12 +6,58 @@ use crate::op::{BinaryOpT, CmpOp, ReduceOp, UnaryOpT};
 use crate::{CpuStorage, CpuStorageRef, DType, Error, Layout, Result, Shape};
 use candle_metal_kernels::{BufferOffset, CallConvTranspose2dCfg, Kernels};
 use metal::{Buffer, NSUInteger};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::sync::{Arc, Mutex, PoisonError, RwLock, TryLockError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError, RwLock, TryLockError};
 
 mod device;
+mod pool;
 pub use device::{DeviceId, MetalDevice, SHARED_BUFFER_STORAGE_MODE};
+pub use pool::{MetalPoolAllocation, MetalTensorPool};
+
+thread_local! {
+    static POOL_STACK: RefCell<Vec<Option<Arc<MetalTensorPool>>>> = RefCell::new(Vec::new());
+}
+
+pub(crate) struct PoolContextGuard;
+
+impl Drop for PoolContextGuard {
+    fn drop(&mut self) {
+        POOL_STACK.with(|stack| {
+            stack.borrow_mut().pop();
+        });
+    }
+}
+
+pub(crate) fn push_pool_context(pool: Option<Arc<MetalTensorPool>>) -> PoolContextGuard {
+    POOL_STACK.with(|stack| stack.borrow_mut().push(pool));
+    PoolContextGuard
+}
+
+fn current_pool() -> Option<Arc<MetalTensorPool>> {
+    POOL_STACK.with(|stack| stack.borrow().last().cloned().flatten())
+}
+
+fn pool_registry() -> &'static Mutex<HashMap<usize, Arc<MetalPoolAllocation>>> {
+    static REGISTRY: OnceLock<Mutex<HashMap<usize, Arc<MetalPoolAllocation>>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn register_pool_allocation(buffer: &Arc<Buffer>, allocation: Arc<MetalPoolAllocation>) {
+    let ptr = Arc::as_ptr(buffer) as usize;
+    if let Ok(mut registry) = pool_registry().lock() {
+        registry.insert(ptr, allocation);
+    }
+}
+
+fn take_pool_allocation(buffer: &Arc<Buffer>) -> Option<Arc<MetalPoolAllocation>> {
+    let ptr = Arc::as_ptr(buffer) as usize;
+    pool_registry()
+        .lock()
+        .ok()
+        .and_then(|mut registry| registry.remove(&ptr))
+}
 
 pub fn buffer_o<'a>(buffer: &'a Buffer, l: &Layout, dtype: DType) -> BufferOffset<'a> {
     BufferOffset {
@@ -77,6 +123,7 @@ pub struct MetalStorage {
     count: usize,
     /// The dtype is kept since buffers are untyped.
     dtype: DType,
+    pool_allocation: Option<Arc<MetalPoolAllocation>>,
 }
 
 impl BackendStorage for MetalStorage {
@@ -113,6 +160,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn affine(&self, layout: &Layout, mul: f64, add: f64) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         let device = self.device().clone();
 
         let shape = layout.shape();
@@ -168,6 +216,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn powf(&self, layout: &Layout, pow: f64) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         let device = self.device().clone();
 
         let shape = layout.shape();
@@ -219,6 +268,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn elu(&self, layout: &Layout, alpha: f64) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         let device = self.device().clone();
 
         let shape = layout.shape();
@@ -270,6 +320,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn reduce_op(&self, op: ReduceOp, layout: &Layout, sum_dims: &[usize]) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         let device = self.device.clone();
 
         let src_stride = layout.stride();
@@ -408,6 +459,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn cmp(&self, op: CmpOp, rhs: &Self, lhs_l: &Layout, rhs_l: &Layout) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, rhs])?;
         let name = match op {
             CmpOp::Eq => "eq",
             CmpOp::Ne => "ne",
@@ -527,6 +579,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn to_dtype(&self, layout: &Layout, dtype: DType) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         let device = self.device();
         let shape = layout.shape();
         let el_count = shape.elem_count();
@@ -644,6 +697,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn unary_impl<B: UnaryOpT>(&self, layout: &Layout) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         let device = self.device();
         let dtype = self.dtype;
         let shape = layout.shape();
@@ -904,6 +958,7 @@ impl BackendStorage for MetalStorage {
         f: &Self,
         f_l: &Layout,
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, t, f])?;
         let device = self.device.clone();
         let shape = t_l.shape();
         let dims = shape.dims();
@@ -956,6 +1011,7 @@ impl BackendStorage for MetalStorage {
         kernel_l: &Layout,
         params: &ParamsConv1D,
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, kernel])?;
         let device = self.device().clone();
         let shape = layout.shape();
         let dims = shape.dims();
@@ -993,6 +1049,7 @@ impl BackendStorage for MetalStorage {
             device,
             count: dst_el,
             dtype: self.dtype,
+            pool_allocation: None,
         };
         let l_out = params.l_out();
         let b = params.b_size;
@@ -1027,6 +1084,7 @@ impl BackendStorage for MetalStorage {
         k_layout: &Layout,
         params: &ParamsConvTranspose1D,
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, k])?;
         const USE_COL2IM_CONV1D_TR: bool = true;
 
         let can_use_col2im = k_layout.is_contiguous()
@@ -1138,6 +1196,7 @@ impl BackendStorage for MetalStorage {
         kernel_l: &Layout,
         params: &ParamsConv2D,
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, kernel])?;
         let device = self.device().clone();
         let shape = layout.shape();
         let dims = shape.dims();
@@ -1183,6 +1242,7 @@ impl BackendStorage for MetalStorage {
             device,
             count: dst_el,
             dtype: self.dtype,
+            pool_allocation: None,
         };
         let h_out = params.out_h();
         let w_out = params.out_w();
@@ -1220,6 +1280,7 @@ impl BackendStorage for MetalStorage {
         kernel_l: &Layout,
         params: &ParamsConvTranspose2D,
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, kernel])?;
         // Kernel shape: (c_in_k, c_out, h_k, w_k)
         // Input shape: (b_size, c_in, h_in, w_in)
         let (out_w, out_h) = (params.out_w(), params.out_h());
@@ -1283,6 +1344,7 @@ impl BackendStorage for MetalStorage {
         (w_k, h_k): (usize, usize),
         (w_stride, h_stride): (usize, usize),
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         let shape = inp_l.shape();
         let (b_size, channels, width, height) = shape.dims4()?;
         let strides = inp_l.stride();
@@ -1325,6 +1387,7 @@ impl BackendStorage for MetalStorage {
         (w_k, h_k): (usize, usize),
         (w_stride, h_stride): (usize, usize),
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         let shape = inp_l.shape();
         let (b_size, channels, width, height) = shape.dims4()?;
         let strides = inp_l.stride();
@@ -1366,6 +1429,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn upsample_nearest2d(&self, inp_l: &Layout, out_w: usize, out_h: usize) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self])?;
         // let inp = &inp.slice(inp_l.start_offset()..);
         let shape = inp_l.shape();
         let dims = shape.dims();
@@ -1405,6 +1469,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn gather(&self, src_l: &Layout, ids: &Self, ids_l: &Layout, dim: usize) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, ids])?;
         if !ids_l.is_contiguous() {
             return Err(crate::Error::RequiresContiguous { op: "gather" }.bt());
         };
@@ -1544,6 +1609,7 @@ impl BackendStorage for MetalStorage {
     }
 
     fn index_select(&self, ids: &Self, src_l: &Layout, ids_l: &Layout, dim: usize) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, ids])?;
         if !ids_l.is_contiguous() {
             crate::bail!("Metal index_select requires contiguous ids")
         }
@@ -1671,6 +1737,7 @@ impl BackendStorage for MetalStorage {
         lhs_l: &Layout,
         rhs_l: &Layout,
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, rhs])?;
         let buffer = self.device.new_buffer(b * m * n, self.dtype, "matmul")?;
         let command_buffer = self.device.command_buffer()?;
         command_buffer.set_label("matmul");
@@ -1819,12 +1886,41 @@ impl BackendStorage for MetalStorage {
 
 impl MetalStorage {
     pub fn new(buffer: Arc<Buffer>, device: MetalDevice, count: usize, dtype: DType) -> Self {
+        let pool_allocation = take_pool_allocation(&buffer);
         Self {
             buffer,
             device,
             count,
             dtype,
+            pool_allocation,
         }
+    }
+
+    pub fn pool(&self) -> Option<Arc<MetalTensorPool>> {
+        self.pool_allocation
+            .as_ref()
+            .map(|allocation| allocation.pool())
+    }
+
+    fn determine_pool(storages: &[&Self]) -> Result<Option<Arc<MetalTensorPool>>> {
+        let mut pool: Option<Arc<MetalTensorPool>> = None;
+        for storage in storages {
+            if let Some(candidate) = storage.pool() {
+                if let Some(existing) = &pool {
+                    if !Arc::ptr_eq(existing, &candidate) {
+                        crate::bail!("Cannot operate on tensors from different pools");
+                    }
+                } else {
+                    pool = Some(candidate);
+                }
+            }
+        }
+        Ok(pool)
+    }
+
+    pub(crate) fn pool_guard(storages: &[&Self]) -> Result<PoolContextGuard> {
+        let pool = Self::determine_pool(storages)?;
+        Ok(push_pool_context(pool))
     }
 
     pub fn buffer(&self) -> &Buffer {
@@ -1838,6 +1934,7 @@ impl MetalStorage {
         lhs_l: &Layout,
         rhs_l: &Layout,
     ) -> Result<Self> {
+        let _guard = Self::pool_guard(&[self, rhs])?;
         let device = self.device();
         let shape = lhs_l.shape();
         let el_count = shape.elem_count();

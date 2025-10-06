@@ -1,6 +1,8 @@
 //! Tensors are N-dimensional matrixes of elements using a single data type.
 #![allow(clippy::redundant_closure_call)]
 use crate::backend::{BackendDevice, BackendStorage};
+#[cfg(feature = "metal")]
+use crate::metal_backend::{push_pool_context, MetalTensorPool};
 use crate::op::{BackpropOp, BinaryOp, CmpOp, Op, ReduceOp, UnaryOp};
 use crate::scalar::TensorOrScalar;
 use crate::shape::{Dim, Dims, ShapeWithOneHole};
@@ -2230,6 +2232,94 @@ impl Tensor {
             device: self.device.clone(),
         };
         Ok(Tensor(Arc::new(tensor_)))
+    }
+
+    pub fn start_pool(&self, size_in_bytes: usize) -> Result<Tensor> {
+        if size_in_bytes == 0 {
+            bail!("Pool size must be greater than 0");
+        }
+        #[cfg(not(feature = "metal"))]
+        {
+            let _ = size_in_bytes;
+            bail!("start_pool requires candle to be built with the `metal` feature")
+        }
+        #[cfg(feature = "metal")]
+        {
+            let device = match &self.device {
+                Device::Metal(device) => device,
+                _ => bail!("start_pool is only supported for tensors on Metal devices"),
+            };
+
+            let pool = MetalTensorPool::new(device.clone(), size_in_bytes)?;
+            let guard = push_pool_context(Some(pool.clone()));
+            let mut pooled_storage = unsafe { device.alloc_uninit(self.shape(), self.dtype())? };
+            drop(guard);
+
+            {
+                let src_storage = self.storage();
+                match &*src_storage {
+                    Storage::Metal(src) => {
+                        src.copy_strided_src(&mut pooled_storage, 0, self.layout())?;
+                    }
+                    _ => unreachable!("Metal tensor expected"),
+                }
+            }
+
+            let storage = Storage::Metal(pooled_storage);
+            let tensor_ = Tensor_ {
+                id: TensorId::new(),
+                storage: Arc::new(RwLock::new(storage)),
+                layout: self.layout.clone(),
+                op: BackpropOp::new1(self, Op::Copy),
+                is_variable: false,
+                dtype: self.dtype,
+                device: self.device.clone(),
+            };
+            Ok(Tensor(Arc::new(tensor_)))
+        }
+    }
+
+    pub fn leave_pool(&self) -> Result<Tensor> {
+        #[cfg(not(feature = "metal"))]
+        {
+            return Ok(self.clone());
+        }
+        #[cfg(feature = "metal")]
+        {
+            let is_pooled =
+                matches!(&*self.storage(), Storage::Metal(storage) if storage.pool().is_some());
+            if !is_pooled {
+                return Ok(self.clone());
+            }
+
+            let device = match &self.device {
+                Device::Metal(device) => device,
+                _ => bail!("leave_pool is only supported for tensors on Metal devices"),
+            };
+
+            let mut new_storage = unsafe { device.alloc_uninit(self.shape(), self.dtype())? };
+            {
+                let src_storage = self.storage();
+                match &*src_storage {
+                    Storage::Metal(src) => {
+                        src.copy_strided_src(&mut new_storage, 0, self.layout())?;
+                    }
+                    _ => unreachable!("Metal tensor expected"),
+                }
+            }
+
+            let storage = Storage::Metal(new_storage);
+            let tensor_ = Tensor_ {
+                id: TensorId::new(),
+                storage: Arc::new(RwLock::new(storage)),
+                layout: self.layout.clone(),
+                op: BackpropOp::new1(self, Op::Copy),
+                is_variable: false,
+                dtype: self.dtype,
+                device: self.device.clone(),
+            };
+            Ok(Tensor(Arc::new(tensor_)))
+        }
     }
 
     /// Returns a new tensor detached from the current graph, gradient are not propagated through

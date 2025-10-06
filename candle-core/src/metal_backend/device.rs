@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
 
-use super::MetalError;
+use super::{current_pool, register_pool_allocation, MetalError};
 
 // iOS and macOS have different storage modes for shared buffers.
 // due to the GPU/CPU management differences.
@@ -242,8 +242,16 @@ impl MetalDevice {
         dtype: DType,
         name: &str,
     ) -> Result<Arc<Buffer>> {
-        let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
-        self.allocate_buffer(size, MTLResourceOptions::StorageModePrivate, name)
+        let size_bytes = element_count * dtype.size_in_bytes();
+        if let Some(pool) = current_pool() {
+            let allocation = pool.allocate(size_bytes)?;
+            let buffer = Arc::clone(allocation.buffer());
+            register_pool_allocation(&buffer, allocation);
+            Ok(buffer)
+        } else {
+            let size = size_bytes as NSUInteger;
+            self.allocate_buffer(size, MTLResourceOptions::StorageModePrivate, name)
+        }
     }
 
     pub fn new_buffer_private(
@@ -252,8 +260,7 @@ impl MetalDevice {
         dtype: DType,
         name: &str,
     ) -> Result<Arc<Buffer>> {
-        let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
-        self.allocate_buffer(size, metal::MTLResourceOptions::StorageModePrivate, name)
+        self.new_buffer(element_count, dtype, name)
     }
 
     /// Creates a new buffer (not necessarily zeroed).
