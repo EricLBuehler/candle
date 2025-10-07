@@ -1,9 +1,10 @@
+use crate::metal_backend::pool::MetalTensorPool;
 use crate::{DType, Result};
 use candle_metal_kernels::Kernels;
 use metal::{Buffer, CommandBuffer, CommandQueue, MTLResourceOptions, NSUInteger};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 
 use super::MetalError;
 
@@ -12,7 +13,12 @@ use super::MetalError;
 #[cfg(target_os = "ios")]
 pub const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeShared;
 #[cfg(not(target_os = "ios"))]
-pub const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeManaged;
+pub const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeShared;
+
+// Pooling should be per-device, not a single global optional pool. Use a global
+// map keyed by DeviceId to avoid cross-device contention and accidental sharing.
+pub(crate) static POOLS: LazyLock<RwLock<HashMap<DeviceId, Arc<MetalTensorPool>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Unique identifier for cuda devices.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -223,6 +229,27 @@ impl MetalDevice {
         commands.wait_until_completed()
     }
 
+    /// Ensure a tensor pool exists for this device and return it. If one does not exist,
+    /// it is created with the provided `size_in_bytes` capacity.
+    ///
+    /// Note: `MetalTensorPool::new` is assumed to take `(metal::Device, usize)`; adjust the
+    /// constructor call if your actual signature differs.
+    pub(crate) fn ensure_pool(&self, size_in_bytes: usize) -> Arc<MetalTensorPool> {
+        // Fast path: try read lock first
+        if let Ok(g) = POOLS.read() {
+            if let Some(p) = g.get(&self.id) {
+                return p.clone();
+            }
+        }
+        // Slow path: upgrade to write lock and insert if still absent
+        let mut g = POOLS
+            .write()
+            .expect("metal tensor pool map poisoned");
+        g.entry(self.id)
+            .or_insert_with(|| Arc::new(MetalTensorPool::new(self, size_in_bytes).unwrap()))
+            .clone()
+    }
+
     pub fn kernels(&self) -> &Kernels {
         &self.kernels
     }
@@ -314,8 +341,13 @@ impl MetalDevice {
         &self,
         size: NSUInteger,
         option: MTLResourceOptions,
-        _name: &str,
+        name: &str,
     ) -> Result<Arc<Buffer>> {
+        let pool = self.ensure_pool(1024*1024*1024);
+        if option == MTLResourceOptions::StorageModeShared {
+            return pool.allocate_buffer(size, name, option);
+        }
+
         let mut buffers = self.buffers.write().map_err(MetalError::from)?;
         if let Some(b) = find_available_buffer(size, option, &buffers) {
             // Cloning also ensures we increment the strong count
