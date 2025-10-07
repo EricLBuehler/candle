@@ -29,6 +29,7 @@ impl MetalTensorPool {
         let descriptor = HeapDescriptor::new();
         descriptor.set_size(size_in_bytes as NSUInteger);
         descriptor.set_storage_mode(MTLStorageMode::Shared);
+        dbg!(descriptor.hazard_tracking_mode());
         // descriptor.set_heap_type(MTLHeapType::Placement);
         // descriptor.set_resource_options(MTLResourceOptions::StorageModePrivate);
 
@@ -71,6 +72,7 @@ impl MetalTensorPool {
                 self.inner.capacity
             )
         }
+        let options = MTLResourceOptions::StorageModeShared | MTLResourceOptions::HazardTrackingModeTracked;
         let size_align = self
             .inner
             .device
@@ -90,7 +92,7 @@ impl MetalTensorPool {
             .new_buffer(size, options)
             .ok_or_else(|| Error::msg("metal heap allocation returned null"))?;
         buffer.set_label(label);
-        println!("allocating {size} with {options:?}");
+        println!("allocating {size}/{label} with {options:?}");
         Ok(Arc::new(buffer))
     }
 }

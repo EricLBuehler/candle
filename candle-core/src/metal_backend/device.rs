@@ -270,7 +270,7 @@ impl MetalDevice {
         name: &str,
     ) -> Result<Arc<Buffer>> {
         let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
-        self.allocate_buffer(size, MTLResourceOptions::StorageModePrivate, name)
+        self.allocate_buffer(size, MTLResourceOptions::StorageModeShared, name)
     }
 
     pub fn new_buffer_private(
@@ -280,7 +280,7 @@ impl MetalDevice {
         name: &str,
     ) -> Result<Arc<Buffer>> {
         let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
-        self.allocate_buffer(size, metal::MTLResourceOptions::StorageModePrivate, name)
+        self.allocate_buffer(size, metal::MTLResourceOptions::StorageModeShared, name)
     }
 
     /// Creates a new buffer (not necessarily zeroed).
@@ -318,7 +318,7 @@ impl MetalDevice {
     pub fn allocate_zeros(&self, size_in_bytes: usize) -> Result<Arc<Buffer>> {
         let buffer = self.allocate_buffer(
             size_in_bytes as NSUInteger,
-            MTLResourceOptions::StorageModePrivate,
+            MTLResourceOptions::StorageModeShared,
             "allocate_zeros",
         )?;
         let command_buffer = self.command_buffer()?;
@@ -343,9 +343,11 @@ impl MetalDevice {
         option: MTLResourceOptions,
         name: &str,
     ) -> Result<Arc<Buffer>> {
-        let pool = self.ensure_pool(1024*1024*1024);
+        // println!("{option:?}");
+        let pool = self.ensure_pool(8*1024*1024*1024);
         if option == MTLResourceOptions::StorageModeShared {
-            return pool.allocate_buffer(size, name, option);
+            // println!("{name}");
+            return pool.allocate_buffer(size, name, MTLResourceOptions::StorageModeShared);
         }
 
         let mut buffers = self.buffers.write().map_err(MetalError::from)?;
@@ -357,7 +359,7 @@ impl MetalDevice {
         let size = buf_size(size);
         let subbuffers = buffers.entry((size, option)).or_insert(vec![]);
 
-        let new_buffer = self.device.new_buffer(size as NSUInteger, option);
+        let new_buffer = self.device.new_buffer(size as NSUInteger, MTLResourceOptions::StorageModeShared);
         let new_buffer = Arc::new(new_buffer);
         subbuffers.push(new_buffer.clone());
 
