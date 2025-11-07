@@ -1,0 +1,14 @@
+diff --git a/include/cutlass/cuda_host_adapter.hpp b/include/cutlass/cuda_host_adapter.hpp
+index 1c8f56a6..7c024abd 100644
+--- a/include/cutlass/cuda_host_adapter.hpp
++++ b/include/cutlass/cuda_host_adapter.hpp
+@@ -143,6 +143,9 @@ namespace cutlass {
+ #endif // defined(CUTLASS_ENABLE_DIRECT_CUDA_DRIVER_CALL)
+ 
+ #if (__CUDACC_VER_MAJOR__ >= 12)
++#define PFN_cuTensorMapEncodeTiled  PFN_cuTensorMapEncodeTiled_v12000
++#define PFN_cuTensorMapEncodeIm2col  PFN_cuTensorMapEncodeIm2col_v12000
++
+ CUTLASS_CUDA_DRIVER_WRAPPER_DECL(cuTensorMapEncodeTiled, 12000);
+ CUTLASS_CUDA_DRIVER_WRAPPER_DECL(cuTensorMapEncodeIm2col, 12000);
+ #endif

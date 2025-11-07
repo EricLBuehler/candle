@@ -1,8 +1,9 @@
 // Build script to run nvcc and generate the C glue code for launching the flash-attention kernel.
 // The cuda build time is very long so one can set the CANDLE_FLASH_ATTN_BUILD_DIR environment
 // variable in order to cache the compiled artifacts and avoid recompiling too often.
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use std::path::PathBuf;
+use std::process::Command;
 
 const KERNEL_FILES: [&str; 33] = [
     "kernels/flash_api.cu",
@@ -40,8 +41,69 @@ const KERNEL_FILES: [&str; 33] = [
     "kernels/flash_fwd_hdim96_bf16_causal_sm80.cu",
 ];
 
+fn ensure_cutlass_patch() -> Result<()> {
+    let manifest_dir = PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").context("CARGO_MANIFEST_DIR not set")?,
+    );
+    let patch_path = manifest_dir.join("patches/cutlass_cuda_host_adapter.patch");
+    if !patch_path.exists() {
+        bail!(
+            "missing CUTLASS patch at {}. Run git clean or re-clone to restore the file.",
+            patch_path.display()
+        );
+    }
+
+    let cutlass_dir = manifest_dir.join("cutlass");
+    if !cutlass_dir.exists() {
+        bail!(
+            "cutlass submodule directory is missing at {}. Run `git submodule update --init --checkout candle-flash-attn/cutlass`.",
+            cutlass_dir.display()
+        );
+    }
+
+    let reverse_status = Command::new("git")
+        .arg("apply")
+        .arg("--reverse")
+        .arg("--check")
+        .arg(&patch_path)
+        .current_dir(&cutlass_dir)
+        .status()
+        .with_context(|| {
+            format!(
+                "failed to check whether CUTLASS patch is already applied using git apply --reverse --check {}",
+                patch_path.display()
+            )
+        })?;
+    if reverse_status.success() {
+        return Ok(());
+    }
+
+    run_command({
+        let mut cmd = Command::new("git");
+        cmd.arg("apply").arg(&patch_path);
+        cmd.current_dir(&cutlass_dir);
+        cmd
+    }, &format!("git apply {} inside {}", patch_path.display(), cutlass_dir.display()))?;
+
+    Ok(())
+}
+
+fn run_command(mut cmd: Command, description: &str) -> Result<()> {
+    let status = cmd
+        .status()
+        .with_context(|| format!("failed to run {description}"))?;
+    if !status.success() {
+        match status.code() {
+            Some(code) => bail!("{description} exited with status {code}"),
+            None => bail!("{description} terminated by signal"),
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=patches/cutlass_cuda_host_adapter.patch");
     for kernel_file in KERNEL_FILES.iter() {
         println!("cargo:rerun-if-changed={kernel_file}");
     }
@@ -55,6 +117,8 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=kernels/block_info.h");
     println!("cargo:rerun-if-changed=kernels/static_switch.h");
     println!("cargo:rerun-if-changed=kernels/hardware_info.h");
+
+    ensure_cutlass_patch()?;
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").context("OUT_DIR not set")?);
     let build_dir = match std::env::var("CANDLE_FLASH_ATTN_BUILD_DIR") {
         Err(_) =>
