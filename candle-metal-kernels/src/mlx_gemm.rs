@@ -1,4 +1,4 @@
-use crate::utils::EncoderProvider;
+use crate::utils::{BufferOffset, EncoderProvider};
 use crate::{ConstantValues, Kernels, MetalKernelError, Source, Value};
 use metal::{Buffer, ComputeCommandEncoderRef, Device, MTLSize, NSUInteger};
 use std::ffi::c_void;
@@ -23,7 +23,7 @@ pub fn call_mlx_gemm(
     rhs_stride: &[usize],
     rhs_offset: usize,
     rhs_buffer: &Buffer,
-    output: &Buffer,
+    output: BufferOffset,
 ) -> Result<(), MetalKernelError> {
     #[derive(Debug)]
     #[repr(C)]
@@ -145,7 +145,7 @@ pub fn call_mlx_gemm(
     encoder.set_compute_pipeline_state(&pipeline);
     encoder.set_buffer(0, Some(lhs_buffer), lhs_offset as NSUInteger);
     encoder.set_buffer(1, Some(rhs_buffer), rhs_offset as NSUInteger);
-    encoder.set_buffer(3, Some(output), 0);
+    encoder.set_buffer(3, Some(output.buffer), output.offset_in_bytes as NSUInteger);
     encoder.set_bytes(
         4,
         std::mem::size_of::<GemmParams>() as u64,
@@ -174,7 +174,7 @@ pub fn call_mlx_gemm(
     };
     encoder.use_resource(lhs_buffer, metal::MTLResourceUsage::Read);
     encoder.use_resource(rhs_buffer, metal::MTLResourceUsage::Read);
-    encoder.use_resource(output, metal::MTLResourceUsage::Write);
+    encoder.use_resource(output.buffer, metal::MTLResourceUsage::Write);
     encoder.dispatch_thread_groups(grid_size, group_size);
     Ok(())
 }
