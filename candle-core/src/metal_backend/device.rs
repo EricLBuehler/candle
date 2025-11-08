@@ -1,9 +1,10 @@
+use crate::metal_backend::pool::MetalTensorPool;
 use crate::{DType, Result};
 use candle_metal_kernels::Kernels;
 use metal::{Buffer, CommandBuffer, CommandQueue, MTLResourceOptions, NSUInteger};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 
 use super::MetalError;
 
@@ -12,7 +13,12 @@ use super::MetalError;
 #[cfg(target_os = "ios")]
 pub const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeShared;
 #[cfg(not(target_os = "ios"))]
-pub const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeManaged;
+pub const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeShared;
+
+// Pooling should be per-device, not a single global optional pool. Use a global
+// map keyed by DeviceId to avoid cross-device contention and accidental sharing.
+pub(crate) static POOLS: LazyLock<RwLock<HashMap<DeviceId, Arc<MetalTensorPool>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Unique identifier for cuda devices.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -223,6 +229,27 @@ impl MetalDevice {
         commands.wait_until_completed()
     }
 
+    /// Ensure a tensor pool exists for this device and return it. If one does not exist,
+    /// it is created with the provided `size_in_bytes` capacity.
+    ///
+    /// Note: `MetalTensorPool::new` is assumed to take `(metal::Device, usize)`; adjust the
+    /// constructor call if your actual signature differs.
+    pub(crate) fn ensure_pool(&self, size_in_bytes: usize) -> Arc<MetalTensorPool> {
+        // Fast path: try read lock first
+        if let Ok(g) = POOLS.read() {
+            if let Some(p) = g.get(&self.id) {
+                return p.clone();
+            }
+        }
+        // Slow path: upgrade to write lock and insert if still absent
+        let mut g = POOLS
+            .write()
+            .expect("metal tensor pool map poisoned");
+        g.entry(self.id)
+            .or_insert_with(|| Arc::new(MetalTensorPool::new(self, size_in_bytes).unwrap()))
+            .clone()
+    }
+
     pub fn kernels(&self) -> &Kernels {
         &self.kernels
     }
@@ -243,7 +270,7 @@ impl MetalDevice {
         name: &str,
     ) -> Result<Arc<Buffer>> {
         let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
-        self.allocate_buffer(size, MTLResourceOptions::StorageModePrivate, name)
+        self.allocate_buffer(size, MTLResourceOptions::StorageModeShared, name)
     }
 
     pub fn new_buffer_private(
@@ -253,7 +280,7 @@ impl MetalDevice {
         name: &str,
     ) -> Result<Arc<Buffer>> {
         let size = (element_count * dtype.size_in_bytes()) as NSUInteger;
-        self.allocate_buffer(size, metal::MTLResourceOptions::StorageModePrivate, name)
+        self.allocate_buffer(size, metal::MTLResourceOptions::StorageModeShared, name)
     }
 
     /// Creates a new buffer (not necessarily zeroed).
@@ -291,7 +318,7 @@ impl MetalDevice {
     pub fn allocate_zeros(&self, size_in_bytes: usize) -> Result<Arc<Buffer>> {
         let buffer = self.allocate_buffer(
             size_in_bytes as NSUInteger,
-            MTLResourceOptions::StorageModePrivate,
+            MTLResourceOptions::StorageModeShared,
             "allocate_zeros",
         )?;
         let command_buffer = self.command_buffer()?;
@@ -314,8 +341,15 @@ impl MetalDevice {
         &self,
         size: NSUInteger,
         option: MTLResourceOptions,
-        _name: &str,
+        name: &str,
     ) -> Result<Arc<Buffer>> {
+        // println!("{option:?}");
+        let pool = self.ensure_pool(8*1024*1024*1024);
+        if option == MTLResourceOptions::StorageModeShared {
+            // println!("{name}");
+            return pool.allocate_buffer(size, name, MTLResourceOptions::StorageModeShared);
+        }
+
         let mut buffers = self.buffers.write().map_err(MetalError::from)?;
         if let Some(b) = find_available_buffer(size, option, &buffers) {
             // Cloning also ensures we increment the strong count
@@ -325,7 +359,7 @@ impl MetalDevice {
         let size = buf_size(size);
         let subbuffers = buffers.entry((size, option)).or_insert(vec![]);
 
-        let new_buffer = self.device.new_buffer(size as NSUInteger, option);
+        let new_buffer = self.device.new_buffer(size as NSUInteger, MTLResourceOptions::StorageModeShared);
         let new_buffer = Arc::new(new_buffer);
         subbuffers.push(new_buffer.clone());
 
